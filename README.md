@@ -9,11 +9,15 @@
 ```bash
 pip install nrlx
 
+```
+
 ## Usage
 
 ```bash
 nrlx version
 nrlx doctor station.xml
+
+```
 
 ## Status
 
@@ -23,4 +27,3 @@ Early Development.
 
 This project is not affiliated with EarthScope, IRIS, or the official Nominal Response Library.
 NRL data remains owned/maintained by its respective providers.
-
