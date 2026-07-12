@@ -1,5 +1,3 @@
-"""Allow running nrlx with `python -m nrlx`."""
-
 from __future__ import annotations
 
 from nrlx.cli import app
