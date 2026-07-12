@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nrlx"
-version = "0.1.0"
+version = "0.1dev1"
 description = "NRL eXtended: tools for building and validating seismic instrument responses."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,19 +23,21 @@ keywords = [
     "instrument response"
 ]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
     "typer>=0.12",
     "rich>=13.0",
     "platformdirs>=4.0",
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
@@ -54,9 +56,6 @@ plot = [
 [project.scripts]
 nrlx = "nrlx.cli:app"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.ruff]
 line-length = 88
 target-version = "py310"
@@ -70,6 +69,12 @@ strict = true
 warn_unused_ignores = true
 warn_return_any = true
 warn_unreachable = true
+
+# obspy is an optional extra without type stubs; its import lives behind the
+# lazy loader in nrlx.inventory.
+[[tool.mypy.overrides]]
+module = ["obspy", "obspy.*"]
+ignore_missing_imports = true
 
 [project.urls]
 Homepage = "https://github.com/vishnurajsreerajnair/nrlx"
