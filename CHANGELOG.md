@@ -2,31 +2,10 @@
 
 Newest first.
 
-## [0.1.dev2] - 12-07-2026
+## [0.2.0] - 2026-07-12
 
-### Added
-
-- `nrlx browse show <instconfig>` — a detail view for one configuration,
-  printing its description and every parameter (Sensitivity, Sensor_Type,
-  corner period, ...), so you can see which values are available as build keys.
-- `Catalog.configuration(instconfig)` — exact instconfig lookup returning a
-  single `Configuration` (or `None`).
-- `Nrlx.sync()` — the Python counterpart to the `nrlx sync` command: downloads
-  the current catalog into the cache and returns a ready `Nrlx`, so refreshing
-  the catalog no longer needs a shell (`from_cache` still reads the copy on
-  disk without a download).
-
-### Changed
-
-- Key/search matching now reaches parameter *names* as well as values, so a key
-  like `Sensitivity` or `groundVel` works alongside `1500` or `40Vpp`.
-- `Catalog.search()` now ORs the query across the same fields as
-  `Configuration.matches()` — manufacturer, model, instconfig, description, and
-  parameter names/values — so `browse configs groundVel` and `--sensor-key
-  groundVel` finally agree (previously `search()` ignored description and
-  parameters).
-
-## [0.1.dev1] - Unreleased
+First functional release — working end to end against the live NRL v2 service.
+(The `0.1.0` on PyPI was an early skeleton, now yanked; see below.)
 
 ### Added
 
@@ -36,13 +15,16 @@ Newest first.
   `instconfig` strings and builds real responses via the live `/combine`
   endpoint (RESP, StationXML, StationXML-Response, all confirmed to
   round-trip through `obspy.read_inventory()`).
+- `Nrlx.from_cache()` / `Nrlx.sync()` constructors: use the catalog already on
+  disk, or download a fresh one first and return a ready `Nrlx`.
 - `Nrlx.combine()` returning a `BuiltResponse` held in memory, with
   `.save()`, `.to_inventory()`, `.to_response()`, and `.to_paz()` converters
   (the obspy-backed ones need the `nrlx[obspy]` extra).
 - ObsPy-v1-style key selection: `resolve(keys=[...])` and repeatable
   `--sensor-key`/`--datalogger-key` CLI flags — unordered, case-insensitive
   substrings ANDed across manufacturer, model, instconfig, description, and
-  parameter values (so `--sensor-key 40Vpp` or `--sensor-key "100 Hz"` work).
+  parameter names and values (so `--sensor-key Sensitivity`, `--sensor-key
+  40Vpp`, or `--sensor-key groundVel` all work).
 - `--channels` on `nrlx build`: several channels write one file each
   (`out_EHZ.xml`, ...), or one merged StationXML inventory with
   `--merge-channels` (needs the obspy extra).
@@ -60,10 +42,16 @@ Newest first.
 - `nrlx.doctor` — structural health checks on a saved response file (valid
   XML/RESP, expected elements/blockettes present), no `obspy` required.
 - CLI commands: `status [--live]`, `sync`, `browse` (subcommands `summary`,
-  `elements`, `manufacturers`, `models`, `configs`), `build`, `doctor`.
-- Free-text positional search on `browse manufacturers`/`models`/`configs`
-  (e.g. `nrlx browse configs lunitek`); `configs` additionally ORs the query
-  across manufacturer, model, and instconfig via `Catalog.search()`.
+  `elements`, `manufacturers`, `models`, `configs`, `show`), `build`, `doctor`.
+- `nrlx browse show <instconfig>` prints one configuration in full — its
+  description and every parameter (Sensitivity, Sensor_Type, corner period,
+  ...) — so you can see which values are available as build keys.
+- Free-text catalog search: `Catalog.search()` and the positional query on
+  `browse manufacturers`/`models`/`configs` match manufacturer, model,
+  instconfig, description, and parameter names/values, so `browse configs
+  groundVel` finds configs by their physical parameters, not just their names.
+- `Catalog.configuration(instconfig)` — exact instconfig lookup returning a
+  single `Configuration` (or `None`).
 - `--instconfig` filter on `browse configs`.
 - CLI-level test suite (`tests/test_cli.py`) and a GitHub Actions CI workflow
   running ruff, mypy, and pytest on Python 3.10–3.13.
@@ -106,6 +94,8 @@ Newest first.
 - "Catalog file not found" error pointed at the removed `update-cache`
   command; it now says `nrlx sync`.
 
-## Project inception - 2026-04-30
+## [0.1.0] - 2026-04-30
 
-- Initial package skeleton (unversioned, never published).
+- Initial package skeleton, published to PyPI. Superseded by 0.2.0 and yanked:
+  it predates the current architecture (a hard `obspy` dependency, no live
+  NRL v2 client) and should not be installed.
