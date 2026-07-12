@@ -171,6 +171,58 @@ def test_search_matches_instconfig_substring(tmp_path):
     assert results[0].instconfig == "datalogger_Quanterra_Q330_FV40Vpp_FR100"
 
 
+def test_search_matches_parameter_value(tmp_path):
+    catalog = Catalog.from_file(_write_catalog(tmp_path, _fixture_data()))
+
+    results = catalog.search("1500")
+
+    assert len(results) == 1
+    assert results[0].parameters == {"Sensitivity": "1500"}
+
+
+def test_search_matches_parameter_name(tmp_path):
+    catalog = Catalog.from_file(_write_catalog(tmp_path, _fixture_data()))
+
+    results = catalog.search("Sensitivity")
+
+    # Both STS-2 configs carry a Sensitivity parameter.
+    assert {c.instconfig for c in results} == {
+        "sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel",
+        "sensor_Streckeisen_STS-2_EG3_SG750_LP120_STgroundVel",
+    }
+
+
+def test_search_matches_description(tmp_path):
+    catalog = Catalog.from_file(_write_catalog(tmp_path, _fixture_data()))
+
+    results = catalog.search("gain 750")
+
+    assert len(results) == 1
+    assert results[0].parameters == {"Sensitivity": "750"}
+
+
+def test_configuration_matches_parameter_name_and_value(tmp_path):
+    catalog = Catalog.from_file(_write_catalog(tmp_path, _fixture_data()))
+    config = catalog.configurations(model="STS-2")[0]
+
+    assert config.matches("Sensitivity")  # parameter name
+    assert config.matches("1500")  # parameter value
+    assert not config.matches("nonexistent")
+
+
+def test_configuration_exact_lookup(tmp_path):
+    catalog = Catalog.from_file(_write_catalog(tmp_path, _fixture_data()))
+
+    found = catalog.configuration(
+        "sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel"
+    )
+    assert found is not None
+    assert found.parameters == {"Sensitivity": "1500"}
+
+    # A substring is not an exact match.
+    assert catalog.configuration("STS-2") is None
+
+
 def test_search_respects_element_scope(tmp_path):
     catalog = Catalog.from_file(_write_catalog(tmp_path, _fixture_data()))
 

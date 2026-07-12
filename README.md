@@ -64,7 +64,7 @@ Three terms cover everything nrlx does:
 | --- | --- |
 | `nrlx status [--live]` | Show version and local cache info; `--live` also checks connectivity. |
 | `nrlx sync` | Download the current NRL catalog into the local cache. |
-| `nrlx browse <summary\|elements\|manufacturers\|models\|configs>` | Browse the cached catalog. |
+| `nrlx browse <summary\|elements\|manufacturers\|models\|configs\|show>` | Browse the cached catalog; `show <instconfig>` prints one config's full parameters. |
 | `nrlx prefixes [query]` | Decode the two-letter parameter codes used in instconfigs (LP, FR, FV, ...). |
 | `nrlx build` | Build a sensor(+datalogger) response and save it to a file. |
 | `nrlx doctor <file>` | Run structural health checks on a saved response file. |
@@ -80,7 +80,19 @@ instconfig at once, since a config doesn't have a single "own name." So
 `browse models streckeisen` looks for a model literally named "streckeisen"
 (nothing) — use `browse models --manufacturer streckeisen` instead — while
 `browse configs streckeisen` works directly, because configs search all three
-fields.
+fields — plus each config's description and parameter names/values, so
+`browse configs groundVel` or `browse configs "400 V/m/s"` find configs by their
+physical parameters, not just their names.
+
+The list views stay deliberately narrow. To see everything one configuration
+carries — description and every parameter (Sensitivity, Sensor_Type, corner
+period, ...) — use `browse show`:
+
+```bash
+nrlx browse show sensor_Lunitek_TELLUS_LP1_SG400_STgroundVel
+```
+
+Those parameter values are exactly what you can pass as build keys (next section).
 
 If a sensor/datalogger filter in `nrlx build` matches more than one configuration,
 it lists every matching `instconfig` string so you can pin down the exact one with
@@ -90,9 +102,11 @@ it lists every matching `instconfig` string so you can pin down the exact one wi
 
 Instead of hunting down the exact instconfig, describe the instrument with
 comma-separated `--sensor-keys`/`--datalogger-keys` (ObsPy-v1 style). Every key
-must match somewhere in a configuration — manufacturer, model, instconfig, or a
-parameter value like `40Vpp` or `100 Hz` (quote keys with spaces:
-`--sensor-keys 'STS-2,100 Hz'`). If the selection is ambiguous, nrlx lists the
+must match somewhere in a configuration — manufacturer, model, instconfig,
+description, or a parameter name or value like `Sensitivity`, `40Vpp`, or
+`groundVel` (quote keys with spaces: `--sensor-keys 'STS-2,100 Hz'`). Use
+`nrlx browse show <instconfig>` to see the full parameter list you can key on.
+If the selection is ambiguous, nrlx lists the
 matching instconfigs; pick distinguishing fragments from that list as your next
 keys:
 
@@ -132,7 +146,9 @@ Everything the CLI does is a thin layer over the `nrlx` package:
 ```python
 from nrlx import Nrlx, ResponseFormat
 
-nrl = Nrlx.from_cache()                      # loads the synced catalog
+nrl = Nrlx.from_cache()                      # loads the catalog already on disk
+# nrl = Nrlx.sync()                          # or download a fresh one first
+#                                            # (first run / to refresh)
 
 # Find and browse
 nrl.catalog.search("lunitek")                # free-text across the catalog
@@ -147,6 +163,35 @@ built = nrl.combine(
 built.content          # raw StationXML bytes
 built.save("out.xml")  # write a file only when you want one
 ```
+
+Each element can be selected by keys (resolved through the catalog) *or* by an
+exact instconfig string - and you can mix the two. The datalogger is optional;
+omit it for a sensor-only response.
+
+```python
+built = nrl.combine(
+    sensor_instconfig="sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel",
+    datalogger_keys=["Q330HR_PG1", "FR40"],   # or datalogger_instconfig="..."
+)
+```
+
+Passing both `sensor_keys` and `sensor_instconfig` for the same element is an
+error (same for the datalogger) - give exactly one.
+
+`combine()` also takes the StationXML identity and validity fields — pass them
+and IRIS stamps them into the response instead of placeholders:
+
+```python
+built = nrl.combine(
+    sensor_keys=["streckeisen", "STS-2", "EG3", "SG1500"],
+    network="XY", station="MYSTN", location="00", channel="HHZ",
+    starttime="2021-01-01", endtime="2025-01-01",
+)
+```
+
+All six are optional; omit them and the service fills in placeholders. If you'd
+rather not commit to StationXML naming at all, skip them and take the bare
+`Response` instead (below).
 
 With the `nrlx[obspy]` extra installed, a `BuiltResponse` converts in memory —
 this is the NRL-v1-style workflow, and the way around StationXML's strict

@@ -2,9 +2,31 @@
 
 Newest first.
 
-## [0.1.0] - 2026-07-12
+## [0.1.dev2] - 12-07-2026
 
-First release.
+### Added
+
+- `nrlx browse show <instconfig>` — a detail view for one configuration,
+  printing its description and every parameter (Sensitivity, Sensor_Type,
+  corner period, ...), so you can see which values are available as build keys.
+- `Catalog.configuration(instconfig)` — exact instconfig lookup returning a
+  single `Configuration` (or `None`).
+- `Nrlx.sync()` — the Python counterpart to the `nrlx sync` command: downloads
+  the current catalog into the cache and returns a ready `Nrlx`, so refreshing
+  the catalog no longer needs a shell (`from_cache` still reads the copy on
+  disk without a download).
+
+### Changed
+
+- Key/search matching now reaches parameter *names* as well as values, so a key
+  like `Sensitivity` or `groundVel` works alongside `1500` or `40Vpp`.
+- `Catalog.search()` now ORs the query across the same fields as
+  `Configuration.matches()` — manufacturer, model, instconfig, description, and
+  parameter names/values — so `browse configs groundVel` and `--sensor-key
+  groundVel` finally agree (previously `search()` ignored description and
+  parameters).
+
+## [0.1.dev1] - Unreleased
 
 ### Added
 

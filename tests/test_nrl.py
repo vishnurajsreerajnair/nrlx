@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -227,6 +228,35 @@ class _FakeResponse:
 
     def raise_for_status(self) -> None:
         return None
+
+
+def test_sync_downloads_catalog_and_returns_ready_nrlx(tmp_path, monkeypatch):
+    config = {"instconfig": "sensor_Streckeisen_STS-2_X", "version": "1"}
+    model = {"name": "STS-2", "configuration": [config]}
+    manufacturer = {"name": "Streckeisen", "model": [model]}
+    element = {"name": "sensor", "manufacturer": [manufacturer]}
+    catalog_bytes = json.dumps(
+        {"NRLCatalog": {"formatversion": 1.0, "element": [element]}}
+    ).encode("utf-8")
+
+    class _CatalogResponse:
+        status_code = 200
+        content = catalog_bytes
+
+        def raise_for_status(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "nrlx.client.httpx.get",
+        lambda url, params=None, timeout=None: _CatalogResponse(),
+    )
+
+    nrl = Nrlx.sync(tmp_path)
+
+    assert isinstance(nrl, Nrlx)
+    assert (tmp_path / "nrl" / "catalog.json").exists()
+    assert nrl.catalog.configuration_count == 1
+    assert nrl.resolve_sensor(model="STS-2").instconfig == "sensor_Streckeisen_STS-2_X"
 
 
 def test_combine_hits_combine_endpoint_and_keeps_bytes_in_memory(

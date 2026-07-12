@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from nrlx.cache import get_catalog_file
+from nrlx.cache import get_catalog_file, sync_catalog
 from nrlx.catalog import Catalog, Configuration, ElementKind
 from nrlx.client import NRLClient
 from nrlx.exceptions import NrlxError, NrlxResponseError
@@ -167,6 +167,40 @@ class Nrlx:
 
         """
         catalog = Catalog.from_file(get_catalog_file(cache_root))
+        client = NRLClient.for_base_url(base_url)
+
+        return cls(client=client, catalog=catalog)
+
+    @classmethod
+    def sync(
+        cls,
+        cache_root: Path | None = None,
+        *,
+        base_url: str | None = None,
+    ) -> Nrlx:
+        """Download the current NRL catalog into the cache, then load it.
+
+        The Python counterpart to the ``nrlx sync`` command: refreshes (or
+        creates, on a fresh machine) the local catalog and hands back an Nrlx
+        ready to use. Reach for ``from_cache`` instead when you just want to
+        read the copy already on disk without a network round-trip.
+
+        Args:
+            cache_root: Custom cache root; defaults to the platform user cache dir.
+            base_url: Optional custom NRL service base URL.
+
+        Returns:
+            Nrlx configured with the freshly downloaded catalog.
+
+        Raises:
+            NrlxCacheError: If the cache cannot be initialized or the download
+                is not valid catalog JSON.
+            NrlxNetworkError: If the catalog download fails.
+
+
+        """
+        catalog_file = sync_catalog(cache_root, base_url=base_url)
+        catalog = Catalog.from_file(catalog_file)
         client = NRLClient.for_base_url(base_url)
 
         return cls(client=client, catalog=catalog)

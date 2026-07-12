@@ -22,8 +22,13 @@ _VALID_STATIONXML = b"""<?xml version="1.0"?>
 """
 
 
-def _config(instconfig: str) -> dict[str, str]:
-    return {"instconfig": instconfig, "version": "1"}
+def _config(
+    instconfig: str, parameters: dict[str, str] | None = None
+) -> dict[str, Any]:
+    data: dict[str, Any] = {"instconfig": instconfig, "version": "1"}
+    if parameters:
+        data["parameters"] = parameters
+    return data
 
 
 def _catalog_dict() -> dict[str, Any]:
@@ -36,7 +41,10 @@ def _catalog_dict() -> dict[str, Any]:
                     {
                         "name": "STS-2",
                         "configuration": [
-                            _config("sensor_Streckeisen_STS-2_A"),
+                            _config(
+                                "sensor_Streckeisen_STS-2_A",
+                                {"Sensitivity": "1500 V/m/s"},
+                            ),
                             _config("sensor_Streckeisen_STS-2_B"),
                         ],
                     }
@@ -115,6 +123,48 @@ def test_browse_manufacturers_positional_query(tmp_path):
 
     assert result.exit_code == 0
     assert "Streckeisen" in result.output
+
+
+def test_browse_show_renders_parameters(tmp_path):
+    _seed_catalog(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "browse", "--cache-root", str(tmp_path),
+            "show", "sensor_Streckeisen_STS-2_A",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Sensitivity" in result.output
+    assert "1500 V/m/s" in result.output
+
+
+def test_browse_show_missing_instconfig_errors(tmp_path):
+    _seed_catalog(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["browse", "--cache-root", str(tmp_path), "show", "does_not_exist"],
+    )
+
+    assert result.exit_code == 1
+    assert "No configuration matches" in result.output
+
+
+def test_browse_show_ambiguous_substring_errors(tmp_path):
+    _seed_catalog(tmp_path)
+
+    # "STS-2" is a substring of both fixture configs, and an exact match of
+    # neither -> ambiguous.
+    result = runner.invoke(
+        app,
+        ["browse", "--cache-root", str(tmp_path), "show", "STS-2"],
+    )
+
+    assert result.exit_code == 1
+    assert "Ambiguous" in result.output
 
 
 def test_doctor_good_file(tmp_path):

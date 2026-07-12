@@ -361,6 +361,52 @@ def browse_configs(
 
     console.print(table)
 
+@browse_app.command("show")
+def browse_show(
+    ctx: typer.Context,
+    instconfig: Annotated[
+        str,
+        typer.Argument(help="Instconfig to inspect (exact, or a unique substring)."),
+    ],
+) -> None:
+    """Show one configuration in full: description and every parameter.
+
+    The list views (configs/models/...) stay narrow on purpose; this is where
+    you see a configuration's parameters - Sensitivity, Sensor_Type, corner
+    period, and so on - so you know which values you can pass as build keys.
+
+
+    """
+    catalog: Catalog = ctx.obj
+
+    exact = catalog.configuration(instconfig)
+    matches = (exact,) if exact else catalog.configurations(instconfig=instconfig)
+    if not matches:
+        _fail(NrlxError(f"No configuration matches instconfig: {instconfig}"))
+    if len(matches) > 1:
+        listed = "\n".join(f"  {c.instconfig}" for c in matches[:20])
+        _fail(
+            NrlxError(
+                f"Ambiguous: {len(matches)} configurations match '{instconfig}'.\n"
+                f"{listed}"
+            )
+        )
+
+    config = matches[0]
+    table = Table(title=config.instconfig)
+    table.add_column("Field")
+    table.add_column("Value")
+    table.add_row("Element", config.element)
+    table.add_row("Manufacturer", config.manufacturer)
+    table.add_row("Model", config.model)
+    table.add_row("Version", config.version)
+    if config.description:
+        table.add_row("Description", config.description)
+    for name, value in config.parameters.items():
+        table.add_row(name, value)
+
+    console.print(table)
+
 @app.command()
 def build(
     output: Annotated[

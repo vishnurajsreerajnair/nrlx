@@ -56,8 +56,10 @@ class Configuration:
         """Return True if ``key`` matches anywhere in this configuration.
 
         Case-insensitive substring check across manufacturer, model,
-        instconfig, description, and every parameter value - the building
-        block for ObsPy-v1-style key lists (unordered, ANDed by the caller).
+        instconfig, description, and every parameter name and value - the
+        building block for ObsPy-v1-style key lists (unordered, ANDed by the
+        caller). Matching parameter names as well as values means a key like
+        ``Sensitivity`` or ``groundVel`` both work.
 
 
         """
@@ -66,6 +68,7 @@ class Configuration:
             self.model,
             self.instconfig,
             self.description,
+            *self.parameters.keys(),
             *self.parameters.values(),
         )
         return any(_matches(key, haystack) for haystack in haystacks)
@@ -327,11 +330,13 @@ class Catalog:
         """Search configurations by a single free-text substring match.
 
         Unlike configurations(), which ANDs each filter against its own field,
-        this ORs the query across manufacturer, model, and instconfig - useful
-        when you don't know which field a term belongs to.
+        this ORs the query across every field a configuration exposes -
+        manufacturer, model, instconfig, description, and parameter names and
+        values (the same reach as ``Configuration.matches``) - useful when you
+        don't know which field a term belongs to.
 
         Args:
-            query: Substring to match against manufacturer, model, or instconfig.
+            query: Substring to match anywhere in a configuration.
             element: Optional element group filter, applied before the search.
 
         Returns:
@@ -341,14 +346,25 @@ class Catalog:
         """
         return tuple(
             configuration
-            for el in self.elements(name=element)
-            for mfr in el.manufacturers()
-            for mdl in mfr.models()
-            for configuration in mdl.configurations()
-            if _matches(query, mfr.name)
-            or _matches(query, mdl.name)
-            or _matches(query, configuration.instconfig)
+            for configuration in self.configurations(element=element)
+            if configuration.matches(query)
         )
+
+    def configuration(self, instconfig: str) -> Configuration | None:
+        """Return the configuration whose instconfig exactly equals ``instconfig``.
+
+        Args:
+            instconfig: Exact instconfig identifier to look up.
+
+        Returns:
+            The matching Configuration, or None if no exact match exists.
+
+
+        """
+        for configuration in self.configurations():
+            if configuration.instconfig == instconfig:
+                return configuration
+        return None
 
 
 def _parse_configuration(
