@@ -1,5 +1,10 @@
 # nrlx
 
+[![PyPI](https://img.shields.io/pypi/v/nrlx)](https://pypi.org/project/nrlx/)
+[![Python versions](https://img.shields.io/pypi/pyversions/nrlx)](https://pypi.org/project/nrlx/)
+[![CI](https://github.com/vishnurajsreerajnair/nrlx/actions/workflows/ci.yml/badge.svg)](https://github.com/vishnurajsreerajnair/nrlx/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **NRL eXtended** — a Python CLI and library for browsing EarthScope/IRIS's Nominal
 Response Library (NRL v2) and building seismic instrument responses.
 
