@@ -12,7 +12,7 @@ response file. Three commands:
 ```bash
 pip install nrlx
 
-nrlx sync                                 # download the catalog (first run and refreshes)
+nrlx sync                                 # download the catalog (first run and refreshes); always healthy to refresh the catalog!
 
 nrlx build --sensor-keys streckeisen,STS-2,EG3,SG1500 \
   --output station.xml                    # a real StationXML/inv file
@@ -31,11 +31,9 @@ nrlx browse models --manufacturer streckeisen      # its models
 nrlx browse configs streckeisen --element sensor   # exact configs + instconfigs
 ```
 
-That `station.xml` is a real FDSN StationXML file straight from IRIS's own service —
-load it anywhere that reads StationXML, including `obspy.read_inventory("station.xml")`.
+That `station.xml` is a real FDSN StationXML file straight from IRIS's own service - load it anywhere that reads StationXML, including `obspy.read_inventory("station.xml")`.
 
-Full command reference and the ifs-and-buts (dataloggers, multiple channels, output
-formats) are below; a fuller walkthrough is planned for the project wiki.
+Full command reference and the ifs-and-buts (dataloggers, multiple channels, output formats) are below; a fuller walkthrough is planned for the project wiki.
 
 ## Install
 
@@ -50,12 +48,12 @@ responses `nrlx` builds — `nrlx` itself never requires it.
 
 Three terms cover everything nrlx does:
 
-- **Catalog** — IRIS's tree of every nominal response, organized as
+- **Catalog** -> IRIS's tree of every nominal response, organized as
   `element` (sensor / datalogger) → `manufacturer` → `model` → `configuration`.
-- **instconfig** — the exact identifier of one configuration, e.g.
+- **instconfig** -> the exact identifier of one configuration, e.g.
   `sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel`. It is what `build`
   actually sends to IRIS. `browse` exists to help you find the right one.
-- **Local cache** — nrlx keeps one copy of the catalog on disk (under your
+- **Local cache** -> nrlx keeps one copy of the catalog on disk (under your
   platform cache dir) so browsing is instant and offline. `sync` refreshes it.
 
 ## Commands
@@ -73,20 +71,20 @@ Run `nrlx <command> --help` for the full option list on any of these — each
 `browse` subcommand only exposes the filters that actually apply to it.
 
 `browse manufacturers`/`models` take an optional positional query that matches
-*that level's own name* (a manufacturer name, a model name) — `--element`/
+*that level's own name* (a manufacturer name, a model name) - `--element`/
 `--manufacturer` remain as flags to narrow by a parent level. `browse configs`
 is the exception: its positional query matches manufacturer, model, *and*
 instconfig at once, since a config doesn't have a single "own name." So
 `browse models streckeisen` looks for a model literally named "streckeisen"
-(nothing) — use `browse models --manufacturer streckeisen` instead — while
+(nothing) - use `browse models --manufacturer streckeisen` instead - while
 `browse configs streckeisen` works directly, because configs search all three
-fields — plus each config's description and parameter names/values, so
+fields - plus each config's description and parameter names/values, so
 `browse configs groundVel` or `browse configs "400 V/m/s"` find configs by their
 physical parameters, not just their names.
 
 The list views stay deliberately narrow. To see everything one configuration
-carries — description and every parameter (Sensitivity, Sensor_Type, corner
-period, ...) — use `browse show`:
+carries - description and every parameter (Sensitivity, Sensor_Type, corner
+period, ...) - use `browse show`:
 
 ```bash
 nrlx browse show sensor_Lunitek_TELLUS_LP1_SG400_STgroundVel
@@ -102,13 +100,11 @@ it lists every matching `instconfig` string so you can pin down the exact one wi
 
 Instead of hunting down the exact instconfig, describe the instrument with
 comma-separated `--sensor-keys`/`--datalogger-keys` (ObsPy-v1 style). Every key
-must match somewhere in a configuration — manufacturer, model, instconfig,
+must match somewhere in a configuration - manufacturer, model, instconfig,
 description, or a parameter name or value like `Sensitivity`, `40Vpp`, or
 `groundVel` (quote keys with spaces: `--sensor-keys 'STS-2,100 Hz'`). Use
 `nrlx browse show <instconfig>` to see the full parameter list you can key on.
-If the selection is ambiguous, nrlx lists the
-matching instconfigs; pick distinguishing fragments from that list as your next
-keys:
+If the selection is ambiguous, nrlx lists the matching instconfigs; pick distinguishing fragments from that list as your next keys:
 
 ```bash
 nrlx build \
@@ -211,7 +207,7 @@ channel = Channel(code="HHZ", location_code="00",
 
 ## Status
 
-v0.1.0 — the first release, working end to end against the live NRL v2 service:
+v0.1.0 - the first release, working end to end against the live NRL v2 service:
 catalog browsing, key/instconfig selection, sensor+datalogger combination,
 multi-channel builds with optional merging, in-memory obspy conversion, and the
 structural `doctor` check. Planned next: response format merging and conversion

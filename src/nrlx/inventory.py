@@ -7,7 +7,6 @@ a clear install hint the moment they actually use a converter.
 
 
 """
-
 from __future__ import annotations
 
 import io

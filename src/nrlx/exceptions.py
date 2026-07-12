@@ -6,8 +6,6 @@ subsystem failed.
 
 
 """
-
-
 class NrlxError(Exception):
     """Base exception for all nrlx-specific errors."""
 
