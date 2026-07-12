@@ -166,7 +166,7 @@ channel = Channel(code="HHZ", location_code="00",
 
 ## Status
 
-Pre-release (`0.1dev1`), working end to end against the live NRL v2 service:
+v0.1.0 — the first release, working end to end against the live NRL v2 service:
 catalog browsing, key/instconfig selection, sensor+datalogger combination,
 multi-channel builds with optional merging, in-memory obspy conversion, and the
 structural `doctor` check. Planned next: response format merging and conversion

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nrlx"
-version = "0.1dev1"
+version = "0.1.0"
 description = "NRL eXtended: tools for building and validating seismic instrument responses."
 readme = "README.md"
 requires-python = ">=3.10"

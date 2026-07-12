@@ -1,9 +1,10 @@
 # Changelog
 
-Newest first. `0.1dev1` (PEP 440: `0.1.dev1`) is a pre-release of the upcoming
-`0.1.0`.
+Newest first.
 
-## [0.1dev1] - 2026-07-12
+## [0.1.0] - 2026-07-12
+
+First release.
 
 ### Added
 
@@ -83,6 +84,6 @@ Newest first. `0.1dev1` (PEP 440: `0.1.dev1`) is a pre-release of the upcoming
 - "Catalog file not found" error pointed at the removed `update-cache`
   command; it now says `nrlx sync`.
 
-## [0.1.0] - 2026-04-30
+## Project inception - 2026-04-30
 
-- Initial package skeleton (never published).
+- Initial package skeleton (unversioned, never published).
