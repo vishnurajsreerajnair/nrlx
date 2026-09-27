@@ -213,7 +213,7 @@ def test_build_happy_path_writes_file(tmp_path, monkeypatch):
     _seed_catalog(tmp_path)
     monkeypatch.setattr(
         "nrlx.client.httpx.get",
-        lambda url, params=None, timeout=None: _FakeResponse(b"<xml/>"),
+        lambda url, params=None, timeout=None, **_: _FakeResponse(b"<xml/>"),
     )
     output = tmp_path / "out.xml"
 
@@ -235,7 +235,7 @@ def test_build_with_repeated_key_flags_resolves_uniquely(tmp_path, monkeypatch):
     _seed_catalog(tmp_path)
     captured = {}
 
-    def fake_get(url, params=None, timeout=None):
+    def fake_get(url, params=None, timeout=None, **_):
         captured["params"] = params
         return _FakeResponse(b"<xml/>")
 
@@ -262,7 +262,7 @@ def test_build_with_comma_separated_keys_resolves_uniquely(tmp_path, monkeypatch
     _seed_catalog(tmp_path)
     captured = {}
 
-    def fake_get(url, params=None, timeout=None):
+    def fake_get(url, params=None, timeout=None, **_):
         captured["params"] = params
         return _FakeResponse(b"<xml/>")
 
@@ -288,7 +288,7 @@ def test_build_with_comma_separated_channels_writes_one_file_each(
     _seed_catalog(tmp_path)
     monkeypatch.setattr(
         "nrlx.client.httpx.get",
-        lambda url, params=None, timeout=None: _FakeResponse(b"<xml/>"),
+        lambda url, params=None, timeout=None, **_: _FakeResponse(b"<xml/>"),
     )
 
     result = runner.invoke(
@@ -311,7 +311,7 @@ def test_build_multiple_channels_writes_one_file_each(tmp_path, monkeypatch):
     _seed_catalog(tmp_path)
     monkeypatch.setattr(
         "nrlx.client.httpx.get",
-        lambda url, params=None, timeout=None: _FakeResponse(b"<xml/>"),
+        lambda url, params=None, timeout=None, **_: _FakeResponse(b"<xml/>"),
     )
 
     result = runner.invoke(
@@ -377,7 +377,7 @@ def test_build_merge_without_obspy_prints_intact_install_hint(tmp_path, monkeypa
     _seed_catalog(tmp_path)
     monkeypatch.setattr(
         "nrlx.client.httpx.get",
-        lambda url, params=None, timeout=None: _FakeResponse(b"<xml/>"),
+        lambda url, params=None, timeout=None, **_: _FakeResponse(b"<xml/>"),
     )
 
     result = runner.invoke(
@@ -421,7 +421,7 @@ def test_prefixes_renders_code_table(monkeypatch):
 
     monkeypatch.setattr(
         "nrlx.client.httpx.get",
-        lambda url, params=None, timeout=None: _FakeJsonResponse(),
+        lambda url, params=None, timeout=None, **_: _FakeJsonResponse(),
     )
 
     result = runner.invoke(app, ["prefixes"])
@@ -439,7 +439,7 @@ def test_sync_happy_path(tmp_path, monkeypatch):
     catalog_bytes = json.dumps(_catalog_dict()).encode("utf-8")
     monkeypatch.setattr(
         "nrlx.client.httpx.get",
-        lambda url, params=None, timeout=None: _FakeResponse(catalog_bytes),
+        lambda url, params=None, timeout=None, **_: _FakeResponse(catalog_bytes),
     )
 
     result = runner.invoke(app, ["sync", "--cache-root", str(tmp_path)])

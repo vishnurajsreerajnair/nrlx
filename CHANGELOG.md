@@ -1,6 +1,10 @@
 # Changelog
 
-Newest first.
+## [0.2.1] - 2026-09-27
+
+### Fixed
+
+- Change of default base name.
 
 ## [0.2.0] - 2026-07-12
 

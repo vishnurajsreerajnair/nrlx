@@ -248,7 +248,7 @@ def test_sync_downloads_catalog_and_returns_ready_nrlx(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "nrlx.client.httpx.get",
-        lambda url, params=None, timeout=None: _CatalogResponse(),
+        lambda url, params=None, timeout=None, **_: _CatalogResponse(),
     )
 
     nrl = Nrlx.sync(tmp_path)
@@ -264,7 +264,7 @@ def test_combine_hits_combine_endpoint_and_keeps_bytes_in_memory(
 ):
     captured = {}
 
-    def fake_get(url, params=None, timeout=None):
+    def fake_get(url, params=None, timeout=None, **_):
         captured["url"] = url
         captured["params"] = params
         return _FakeResponse()
@@ -289,7 +289,7 @@ def test_combine_hits_combine_endpoint_and_keeps_bytes_in_memory(
 def test_combine_resolves_keys_internally(tmp_path, monkeypatch):
     captured = {}
 
-    def fake_get(url, params=None, timeout=None):
+    def fake_get(url, params=None, timeout=None, **_):
         captured["params"] = params
         return _FakeResponse()
 

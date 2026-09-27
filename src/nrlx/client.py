@@ -17,7 +17,8 @@ import httpx
 
 from nrlx.exceptions import NrlxError, NrlxNetworkError
 
-DEFAULT_NRL_BASE_URL = "https://service.iris.edu/irisws/nrl/1/"
+# IRIS services moved to EarthScope; service.iris.edu now 301-redirects here.
+DEFAULT_NRL_BASE_URL = "https://service.earthscope.org/irisws/nrl/1/"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
 
@@ -118,11 +119,15 @@ class NRLClient:
         """
         url = self.build_url(path)
 
+        # Unlike requests (and browsers), httpx does not follow redirects by
+        # default: a moved endpoint would surface as a bare 301 error.
         try:
-            response = httpx.get(url, params=params, timeout=self.timeout)
+            response = httpx.get(
+                url, params=params, timeout=self.timeout, follow_redirects=True
+            )
             response.raise_for_status()
         except httpx.HTTPError as exc:
-            raise NrlxNetworkError(f"NRL request failed: {url}") from exc
+            raise NrlxNetworkError(f"NRL request failed: {url} ({exc})") from exc
 
         return response
 
