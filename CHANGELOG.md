@@ -145,6 +145,18 @@ command, `nrlx response`; the Python API changes as listed below.
 
 ### Fixed
 
+- A code of the table (`FR`) stands for its parameter only: where the configurations
+  searched do not have it, the condition matches none and the hint says so, instead
+  of falling back to the start of a word (`--sensor FR=100` filtered the sensors by
+  their High-Frequency corner).
+- A condition with a number names one parameter more often: among the parameters
+  its name stands for, those without a number in their values are left out
+  (`sens>1000` is Sensitivity, not Sensor_Type). `resolve_parameter` takes the
+  value of the condition and the values of the parameters.
+- `nrlx response -i`: the prompts say `Choice (1-80)` instead of listing every
+  number, a step with one option is taken without asking, and the channel prompt
+  explains its empty default. The catalog view leaves out the manufacturers
+  without models, which the NRL catalog lists.
 - `nrlx sync` and `Nrlx.sync` validate the download before writing it: an error
   page or a broken catalog no longer replaces the previous catalog in the cache.
 - Repeated channels are rejected, instead of writing the same file twice.

@@ -185,6 +185,28 @@ def test_find_ambiguous_parameter_name_needs_the_other_keys(prefixes):
     ]
 
 
+def test_find_number_leaves_out_the_parameters_without_numbers(prefixes):
+    catalog = make_catalog(
+        [
+            (
+                "sensor_Lunitek_TELLUS_SG400",
+                {"Sensitivity": "400 V/m/s", "Sensor_Type": "groundVel"},
+            ),
+            (
+                "sensor_Lunitek_TELLUS_SG2000",
+                {"Sensitivity": "2000 V/m/s", "Sensor_Type": "groundVel"},
+            ),
+        ]
+    )
+
+    # sens is Sensitivity or Sensor_Type; only Sensitivity has numbers
+    assert instconfigs(catalog.find(["sens>1000"], prefixes).rows) == [
+        "sensor_Lunitek_TELLUS_SG2000"
+    ]
+    with pytest.raises(ValueError, match="stands for several parameters"):
+        catalog.find(["sens=groundVel"], prefixes)
+
+
 @pytest.mark.parametrize(
     ("keys", "hints"),
     [

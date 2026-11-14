@@ -296,16 +296,12 @@ class Catalog(CatalogInput, frozen=True):
         tiered = [(row, tiers) for row, tiers in tiered if NOT_FOUND not in tiers]
 
         # the conditions, on the parameters of the rows of the words
-        configurations = [configuration for (*_, configuration), _ in tiered]
-        names = sorted(
-            {
-                name
-                for configuration in configurations
-                for name in configuration.parameters
-            }
-        )
+        values: dict[str, list[str]] = dict()
+        for (*_, configuration), _ in tiered:
+            for name, value in configuration.parameters.items():
+                values.setdefault(name, []).append(value)
         for name, operator, value in conditions:
-            match resolve_parameter(name, codes, names):
+            match resolve_parameter(name, value, codes, values):
                 case [parameter]:
                     kept = list()
                     for row, tiers in tiered:
@@ -380,15 +376,12 @@ class Catalog(CatalogInput, frozen=True):
 
 
         """
-        [(name, _, _), *_] = split_condition(key)
-        names = sorted(
-            {
-                parameter
-                for *_, configuration in rows
-                for parameter in configuration.parameters
-            }
-        )
-        match resolve_parameter(name, codes, names):
+        [(name, _, wanted), *_] = split_condition(key)
+        values: dict[str, list[str]] = dict()
+        for *_, configuration in rows:
+            for parameter, value in configuration.parameters.items():
+                values.setdefault(parameter, []).append(value)
+        match resolve_parameter(name, wanted, codes, values):
             case [parameter, *_]:
                 present = sort_values(
                     [
@@ -402,7 +395,7 @@ class Catalog(CatalogInput, frozen=True):
                     f"Values there: {', '.join(present)}"
                 )
             case _:
-                listed = ", ".join(names) or "none"
+                listed = ", ".join(sorted(values)) or "none"
                 hint = (
                     f"{key}: no parameter {name!r} with the other keys. "
                     f"Parameters there: {listed}"

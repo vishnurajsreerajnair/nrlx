@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import obspy
 from typer.testing import CliRunner
 
@@ -19,6 +21,20 @@ def test_response_without_keys_shows_the_catalog(cache_root, fake_service):
     assert "Streckeisen" in result.output
     assert "Quanterra" in result.output
     assert fake_service.requests == []
+
+
+def test_response_tree_leaves_out_the_manufacturers_without_models(cache_root):
+    catalogfile = cache_root / "nrl" / "catalog.json"
+    content = json.loads(catalogfile.read_bytes())
+    sensors = content["NRLCatalog"]["element"][0]
+    sensors["manufacturer"].append({"name": "EmptyMaker", "model": []})
+    catalogfile.write_text(json.dumps(content))
+
+    result = runner.invoke(app, ["response", "--cache-root", str(cache_root)])
+
+    assert result.exit_code == 0
+    assert "Streckeisen" in result.output
+    assert "EmptyMaker" not in result.output
 
 
 def test_response_bare_keys_list_the_rows_and_what_varies(cache_root):
@@ -277,9 +293,34 @@ def test_response_interactive_asks_prints_the_line_and_writes(
     )
 
     assert result.exit_code == 0, result.output
+    assert "Choice (1-5):" in result.output
+    assert "[1/2" not in result.output
+    assert "()" not in result.output
     assert (
         f"nrlx response --sensor {SENSOR} --network XY --station TST "
         f"--location 00 --channels HHZ,HHN -o {output}"
     ) in result.output
     channels = obspy.read_inventory(output)[0][0]
     assert [channel.code for channel in channels] == ["HHZ", "HHN"]
+
+
+def test_response_interactive_takes_the_only_options(
+    cache_root, fake_service, make_stationxml, tmp_path
+):
+    fake_service.contents["combine"] = make_stationxml("ZZZ")
+    output = tmp_path / "dl.xml"
+
+    # datalogger only: one manufacturer, one model, one configuration
+    answers = ["3", "XY", "TST", "00", "HHZ", str(output)]
+    result = runner.invoke(
+        app,
+        ["response", "-i", "--cache-root", str(cache_root)],
+        input="\n".join([*answers, ""]),
+        terminal_width=300,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Quanterra (the only one)" in result.output
+    assert "Q330 (the only one)" in result.output
+    assert f"--datalogger {DATALOGGER}" in result.output
+    assert output.exists()

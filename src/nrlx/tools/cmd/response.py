@@ -423,7 +423,7 @@ def split_channels(inventory: Inventory) -> list[tuple[str, Inventory]]:
 
 
 def show_tree(nrl: Nrlx) -> None:
-    """Print the catalog: each manufacturer of each element, with its counts
+    """Print the catalog: each manufacturer with models, by element, with its counts
 
     Args:
         nrl: catalog.
@@ -435,7 +435,13 @@ def show_tree(nrl: Nrlx) -> None:
     table.add_column("Manufacturer")
     table.add_column("Models", justify="right")
     table.add_column("Configurations", justify="right")
-    for element, manufacturer in nrl.catalog.get_manufacturers():
+    # the manufacturers that have models only, as the catalog lists some without
+    manufacturers = [
+        (element, manufacturer)
+        for element, manufacturer in nrl.catalog.get_manufacturers()
+        if manufacturer.models
+    ]
+    for element, manufacturer in manufacturers:
         configurations = sum(len(model.configurations) for model in manufacturer.models)
         table.add_row(
             element.name,
@@ -634,7 +640,9 @@ def ask(
     for number, combination in enumerate(COMBINATIONS, start=1):
         console.print(f"  {number}. {' + '.join(combination)}")
     choice = IntPrompt.ask(
-        "Choice", choices=[str(n) for n in range(1, len(COMBINATIONS) + 1)]
+        f"Choice (1-{len(COMBINATIONS)})",
+        choices=[str(n) for n in range(1, len(COMBINATIONS) + 1)],
+        show_choices=False,
     )
     combination = COMBINATIONS[choice - 1]
     chosen = {part: ask_part(nrl, part) for part in combination}
@@ -644,7 +652,12 @@ def ask(
     network = Prompt.ask("Network code", default="XX")
     station = Prompt.ask("Station code", default="STA")
     location = Prompt.ask("Location code", default="00")
-    codes = split_keys([Prompt.ask("Channel codes, comma-separated", default="")]) or []
+    channels = Prompt.ask(
+        "Channel codes, comma-separated (empty for one service placeholder)",
+        default="",
+        show_default=False,
+    )
+    codes = split_keys([channels]) or []
     output = Path(Prompt.ask("File to write (.xml or .resp)", default="response.xml"))
 
     return selections, network, station, location, codes, output
@@ -692,7 +705,7 @@ def ask_part(nrl: Nrlx, part: str) -> list[str]:
 
 
 def choose(question: str, options: list[str]) -> str:
-    """Ask one of the options by its number
+    """Ask one of the options by its number, or take the only one
 
     Args:
         question: the question.
@@ -704,11 +717,18 @@ def choose(question: str, options: list[str]) -> str:
 
     """
     console.print(f"\n{escape(question)}")
-    for number, option in enumerate(options, start=1):
-        console.print(f"  {number}. {escape(option)}")
-    choice = IntPrompt.ask(
-        "Choice", choices=[str(n) for n in range(1, len(options) + 1)]
-    )
-    chosen = options[choice - 1]
+    match options:
+        case [only]:
+            console.print(f"  {escape(only)} (the only one)")
+            chosen = only
+        case _:
+            for number, option in enumerate(options, start=1):
+                console.print(f"  {number}. {escape(option)}")
+            choice = IntPrompt.ask(
+                f"Choice (1-{len(options)})",
+                choices=[str(n) for n in range(1, len(options) + 1)],
+                show_choices=False,
+            )
+            chosen = options[choice - 1]
 
     return chosen

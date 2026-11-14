@@ -171,18 +171,24 @@ def contains(text: str, query: str | None) -> bool:
 
 
 def resolve_parameter(
-    name: str, codes: list[tuple[str, str]], parameter_names: list[str]
+    name: str,
+    wanted: str,
+    codes: list[tuple[str, str]],
+    values: dict[str, list[str]],
 ) -> list[str]:
     """Parameter names that the name of a condition stands for
 
-    A code of the table (FR) stands for its parameter (Final_Sample_Rate); any other
-    name is a whole parameter name or the start of one of its words (corner for
-    Long-Period_Corner), case-insensitive.
+    A code of the table (FR) stands for its parameter (Final_Sample_Rate) only, none
+    when the configurations searched do not have it; any other name is a whole
+    parameter name or the start of one of its words (corner for
+    Long-Period_Corner), case-insensitive. A number leaves out the parameters
+    without a number in their values: sens>1000 is Sensitivity, not Sensor_Type.
 
     Args:
         name: name of the condition, for example FR or corner.
+        wanted: value of the condition, for example 40.
         codes: code and parameter name of each code of the table.
-        parameter_names: parameter names of the configurations searched.
+        values: values of each parameter in the configurations searched, by name.
 
     Returns:
         the parameter names, sorted: several when the name is ambiguous, none when
@@ -193,23 +199,33 @@ def resolve_parameter(
     lowered = name.lower()
 
     # a code stands for its parameter, among the parameters searched
+    iscode = any(code.lower() == lowered for code, _ in codes)
     bycode = [
         parameter
         for code, parameter in codes
-        if code.lower() == lowered and parameter in parameter_names
+        if code.lower() == lowered and parameter in values
     ]
 
     # a whole name, or the start of a word of the name
     byname = [
         parameter
-        for parameter in parameter_names
+        for parameter in values
         if parameter.lower() == lowered
         or any(
             word.startswith(lowered)
             for word in parameter.lower().replace("-", "_").split("_")
         )
     ]
-    parameters = sorted(set(bycode or byname))
+
+    # a number, among the names with numbers when there are some
+    numeric = [
+        parameter
+        for parameter in byname
+        if any(to_number(value) is not None for value in values[parameter])
+    ]
+    if to_number(wanted) is not None and numeric:
+        byname = numeric
+    parameters = sorted(set(bycode if iscode else byname))
 
     return parameters
 

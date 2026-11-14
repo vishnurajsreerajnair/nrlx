@@ -8,6 +8,7 @@ from nrlx.core.matching import (
     START,
     WHOLE,
     compare,
+    resolve_parameter,
     split_condition,
     to_number,
     varying_values,
@@ -120,3 +121,39 @@ def test_varying_values_keeps_the_parameters_with_several_values() -> None:
         "Sensitivity": ["750 V/m/s", "1500 V/m/s", "20000 V/m/s"]
     }
     assert varying_values([]) == {}
+
+
+# the parameters of a sensor and a datalogger, with their values
+VALUES = {
+    "Long-Period_Corner": ["1 s", "120 s"],
+    "High-Frequency_Corner": ["50 Hz"],
+    "Sensitivity": ["400 V/m/s"],
+    "Sensor_Type": ["groundVel"],
+}
+CODES = [
+    ("LP", "Long-Period_Corner"),
+    ("SG", "Sensitivity"),
+    ("FR", "Final_Sample_Rate"),
+]
+
+
+@pytest.mark.parametrize(
+    ("name", "wanted", "parameters"),
+    [
+        # a code, among the parameters searched only
+        ("LP", "1", ["Long-Period_Corner"]),
+        ("lp", "1", ["Long-Period_Corner"]),
+        ("FR", "100", []),
+        # a whole name, or the start of a word of a name
+        ("sensitivity", "400", ["Sensitivity"]),
+        ("corner", "1", ["High-Frequency_Corner", "Long-Period_Corner"]),
+        ("high", "50", ["High-Frequency_Corner"]),
+        # a number leaves out the parameters without numbers, a text does not
+        ("sens", "1000", ["Sensitivity"]),
+        ("sens", "groundVel", ["Sensitivity", "Sensor_Type"]),
+        ("type", "1", ["Sensor_Type"]),
+        ("nothing", "1", []),
+    ],
+)
+def test_resolve_parameter(name: str, wanted: str, parameters: list[str]) -> None:
+    assert resolve_parameter(name, wanted, CODES, VALUES) == parameters
