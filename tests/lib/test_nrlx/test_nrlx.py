@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
+import obspy
 import pytest
 from obspy import UTCDateTime
 
 from nrlx.io.cache import get_catalog_file, get_prefixes_file
 from nrlx.models.nrlx import Nrlx
+
+DATA_DIR = Path(__file__).parents[2] / "data"
 
 
 def test_from_cache(cache_root):
@@ -81,7 +85,7 @@ def test_find_uses_the_code_table(nrl):
 def test_response_resolves_the_parts_and_asks_once(nrl, fake_service, make_stationxml):
     fake_service.contents["combine"] = make_stationxml("ZZZ")
 
-    inventory = nrl.response(
+    inventory, notes = nrl.response(
         sensor=["STS-2", "SG=1500"],
         datalogger=["Q330"],
         network="XY",
@@ -101,12 +105,13 @@ def test_response_resolves_the_parts_and_asks_once(nrl, fake_service, make_stati
     [station] = network
     assert (network.code, station.code) == ("XY", "TST")
     assert [channel.code for channel in station] == ["HHZ", "HHN", "HHE"]
+    assert notes == []
 
 
 def test_response_places_the_channels(nrl, fake_service, make_stationxml):
     fake_service.contents["combine"] = make_stationxml("ZZZ")
 
-    inventory = nrl.response(
+    inventory, _ = nrl.response(
         sensor=["STS-2", "SG=1500"],
         channels=["HHZ"],
         starttime=datetime(2026, 1, 1),
@@ -136,3 +141,41 @@ def test_response_refuses_an_invalid_request(nrl, fake_service):
     with pytest.raises(ValueError, match="go as a sensor"):
         nrl.response(sensor=["STS-1"], soh=["temperature"])
     assert fake_service.requests == []
+
+
+def test_response_combines_a_file_part_with_the_nrl_part_alone(nrl, fake_service):
+    fake_service.contents["combine"] = (DATA_DIR / "nrl_part_q330hr.xml").read_bytes()
+    sensor = obspy.read_inventory(DATA_DIR / "nrl_part_ea120.xml")[0][0][0].response
+
+    inventory, notes = nrl.response(
+        sensor_response=sensor,
+        datalogger=["Q330"],
+        network="XY",
+        station="TST",
+        channels=["HHZ", "HHN"],
+    )
+
+    # the datalogger asked alone, the Eentec normalization corrected
+    [request] = fake_service.requests
+    assert request.params["instconfig"] == DATALOGGER
+    assert [note.split(":")[0] for note in notes] == ["stage 1"]
+    [network] = inventory
+    [station] = network
+    assert (network.code, station.code) == ("XY", "TST")
+    assert [channel.code for channel in station] == ["HHZ", "HHN"]
+    channel = station[0]
+    assert channel.location_code == "00"
+    assert channel.sample_rate == pytest.approx(40.0)
+    assert channel.response.response_stages[0].input_units.upper() == "M/S**2"
+    assert channel.response.instrument_sensitivity.output_units.upper() == "COUNT"
+
+
+def test_response_of_two_file_parts_asks_nothing(nrl, fake_service):
+    sensor = obspy.read_inventory(DATA_DIR / "nrl_part_sts2.xml")[0][0][0].response
+    datalogger = obspy.read_inventory(DATA_DIR / "nrl_part_centaur.xml")
+    datalogger = datalogger[0][0][0].response
+
+    inventory, _ = nrl.response(sensor_response=sensor, datalogger_response=datalogger)
+
+    assert fake_service.requests == []
+    assert inventory[0][0][0].code == "ZZZ"

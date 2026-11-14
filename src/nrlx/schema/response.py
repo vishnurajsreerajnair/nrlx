@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Literal
 
 import msgspec
+from obspy.core.inventory.response import Response
 
 ResponseFormat = Literal["resp", "stationxml", "stationxml-resp"]
 
@@ -21,11 +22,17 @@ class ResponseInput(
 
     Each part is selected by keys (see Catalog.find): a sensor, a datalogger or
     both, an integrated instrument alone, or a state of health channel alone. The
-    labels not given keep the placeholders of the NRL service.
+    sensor and the datalogger can instead be responses read from files, combined by
+    nrlx with the other part. The labels not given keep the placeholders of the NRL
+    service.
 
     Args:
         sensor: keys of the sensor, None without a sensor.
         datalogger: keys of the datalogger, None without a datalogger.
+        sensor_response: response of the sensor, or of a whole channel, in place
+            of its keys; None to select it by keys.
+        datalogger_response: response of the datalogger, or of a whole channel, in
+            place of its keys; None to select it by keys.
         integrated: keys of the integrated instrument (sensor and datalogger in
             one), None without one.
         soh: keys of the state of health channel, None without one.
@@ -49,6 +56,8 @@ class ResponseInput(
 
     sensor: list[str] | None = None
     datalogger: list[str] | None = None
+    sensor_response: Response | None = None
+    datalogger_response: Response | None = None
     integrated: list[str] | None = None
     soh: list[str] | None = None
     network: str | None = None
@@ -63,17 +72,29 @@ class ResponseInput(
     depth: float = 0.0
 
     def __post_init__(self) -> None:
-        # the parts given, each with keys, in an allowed combination
+        # a part by keys or by a response, not both
+        if self.sensor is not None and self.sensor_response is not None:
+            raise ValueError("The sensor is given by keys or by a response, not both.")
+        if self.datalogger is not None and self.datalogger_response is not None:
+            raise ValueError(
+                "The datalogger is given by keys or by a response, not both."
+            )
+
+        # the parts given, each with keys or a response, in an allowed combination
         selections = [
-            ("sensor", self.sensor),
-            ("datalogger", self.datalogger),
-            ("integrated", self.integrated),
-            ("soh", self.soh),
+            ("sensor", self.sensor, self.sensor_response),
+            ("datalogger", self.datalogger, self.datalogger_response),
+            ("integrated", self.integrated, None),
+            ("soh", self.soh, None),
         ]
-        parts = [name for name, keys in selections if keys is not None]
-        empty = [name for name, keys in selections if keys is not None and not keys]
+        empty = [name for name, keys, _ in selections if keys is not None and not keys]
         if empty:
             raise ValueError(f"The keys of the parts must not be empty: {empty}")
+        parts = [
+            name
+            for name, keys, response in selections
+            if keys is not None or response is not None
+        ]
         match parts:
             case ["sensor"] | ["datalogger"] | ["sensor", "datalogger"]:
                 pass
@@ -90,6 +111,15 @@ class ResponseInput(
                     f"instrument alone, or a state of health channel alone. "
                     f"Provided {parts}"
                 )
+
+        # a response from a file is combined with the other part
+        if (
+            self.sensor_response is not None or self.datalogger_response is not None
+        ) and parts != ["sensor", "datalogger"]:
+            raise ValueError(
+                "A response from a file is combined with the other part: give a "
+                "sensor and a datalogger."
+            )
 
         # a channel requested twice would be written twice
         repeated = [

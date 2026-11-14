@@ -4,6 +4,7 @@ from datetime import datetime
 
 import msgspec
 import pytest
+from obspy.core.inventory.response import Response
 
 from nrlx.schema.response import ResponseInput
 
@@ -87,3 +88,43 @@ def test_decoded_from_json_with_iso_times():
 def test_unknown_fields_are_refused():
     with pytest.raises(msgspec.ValidationError, match="unknown field"):
         msgspec.json.decode(b'{"sensor": ["a"], "colour": "red"}', type=ResponseInput)
+
+
+@pytest.mark.parametrize(
+    "parts",
+    [
+        {"sensor_response": Response(), "datalogger": ["a"]},
+        {"sensor": ["a"], "datalogger_response": Response()},
+        {"sensor_response": Response(), "datalogger_response": Response()},
+    ],
+)
+def test_allowed_response_parts(parts):
+    ResponseInput(**parts)
+
+
+@pytest.mark.parametrize(
+    ("parts", "message"),
+    [
+        ({"sensor": ["a"], "sensor_response": Response()}, "keys or by a response"),
+        (
+            {"datalogger": ["a"], "datalogger_response": Response()},
+            "keys or by a response",
+        ),
+        ({"sensor_response": Response()}, "combined with the other part"),
+        ({"datalogger_response": Response()}, "combined with the other part"),
+        (
+            {"sensor_response": Response(), "integrated": ["a"]},
+            "go as a sensor",
+        ),
+    ],
+)
+def test_refused_response_parts(parts, message):
+    with pytest.raises(ValueError, match=message):
+        ResponseInput(**parts)
+
+
+def test_a_response_is_not_decoded_from_json():
+    with pytest.raises(msgspec.ValidationError, match="Expected `Response`"):
+        msgspec.json.decode(
+            b'{"sensor_response": {}, "datalogger": ["a"]}', type=ResponseInput
+        )

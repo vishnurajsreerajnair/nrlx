@@ -76,16 +76,25 @@ command, `nrlx response`; the Python API changes as listed below.
   `BuildInput`. They are written on the station and on every channel of each
   StationXML (`io.inventory.set_coordinates`), merged or one per channel, instead
   of the service placeholders; they need the stationxml format, not zipped.
-- **`Nrlx.response(...)`** returns an obspy `Inventory`: each part (`sensor`,
-  `datalogger`, `integrated`, `soh`) selected by keys and resolved before any
-  request, one `/combine` request, a copy of the channel for each code (written as
-  given), and the network, station, location, times and coordinates set by nrlx
-  (the labels not given keep the service placeholders). Its request is
-  `schema.response.ResponseInput`, which checks the parts (a sensor, a datalogger
-  or both, an integrated or a state of health channel alone), the channels, the
-  times and the coordinates. `Nrlx.find(keys, element)` is `Catalog.find` with the
-  code table. `io.inventory.label_channels` labels the channels, and
-  `set_coordinates` works on an `Inventory`.
+- **`Nrlx.response(...)`** returns an obspy `Inventory` and the notes of the
+  combination: each part (`sensor`, `datalogger`, `integrated`, `soh`) selected by
+  keys and resolved before any request, one `/combine` request, a copy of the
+  channel for each code (written as given), and the network, station, location,
+  times and coordinates set by nrlx (the labels not given keep the service
+  placeholders). The sensor or the datalogger, or both, can instead be obspy
+  responses (`sensor_response=`, `datalogger_response=`, for example from your
+  own files): the NRL part is then asked alone (`Nrlx.part(instconfig)`) and nrlx
+  combines the two with `combine_responses`, whose notes it returns (empty with
+  NRL parts only). Its request is `schema.response.ResponseInput`, which checks
+  the parts (a sensor, a datalogger or both, an integrated or a state of health
+  channel alone, a part by keys or by a response, a response with the other
+  part), the channels, the times and the coordinates. `Nrlx.find(keys, element)`
+  is `Catalog.find` with the code table. `io.inventory.label_channels` labels the
+  channels, and `set_coordinates` works on an `Inventory`;
+  `io.inventory.read_part(path, seed_id)` reads the response of a channel from any
+  file obspy reads (picked by `NET.STA.LOC.CHA` when the file has several), and
+  `placeholder_inventory` puts a response in the `XX.YY.00.ZZZ` channel of the
+  service.
 - `black --check` in the `dev` extra and in CI.
 - **RESP writer**, `io.resp.write_resp(inventory)`: the responses of an obspy
   `Inventory` as RESP text, every channel one after the other, which obspy cannot

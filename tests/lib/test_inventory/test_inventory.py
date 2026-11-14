@@ -1,10 +1,21 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
+import obspy
+import pytest
 from obspy import UTCDateTime
 
-from nrlx.io.inventory import label_channels, read_stationxml, set_coordinates
+from nrlx.io.inventory import (
+    label_channels,
+    placeholder_inventory,
+    read_part,
+    read_stationxml,
+    set_coordinates,
+)
+
+DATA_DIR = Path(__file__).parents[2] / "data"
 
 
 def test_label_channels_copies_the_channel_for_each_code(make_stationxml):
@@ -82,3 +93,59 @@ def test_set_coordinates_places_the_station_and_its_channels(make_stationxml):
         for channel in station
     ] == [(49.096, -8.432, 112.0, 25.0), (49.096, -8.432, 112.0, 25.0)]
     assert response[0][0].latitude == 0.0
+
+
+def test_read_part_of_a_single_channel():
+    expected = obspy.read_inventory(DATA_DIR / "nrl_sts2_q330.xml")[0][0][0].response
+
+    response = read_part(DATA_DIR / "nrl_sts2_q330.xml")
+    from_resp = read_part(DATA_DIR / "nrl_sts2_q330.resp")
+
+    assert response == expected
+    assert len(from_resp.response_stages) == len(expected.response_stages)
+
+
+def test_read_part_picks_a_channel_by_its_seed_id(tmp_path, make_stationxml):
+    path = tmp_path / "two.xml"
+    inventory = read_stationxml(make_stationxml("HHZ"))
+    inventory = label_channels(inventory, None, None, "00", ["HHZ", "HHN"], None, None)
+    inventory[0][0][1].response.response_stages[0].stage_gain = 750.0
+    inventory.write(str(path), format="STATIONXML")
+
+    response = read_part(path, "XY.MYSTN.00.HHN")
+
+    assert response.response_stages[0].stage_gain == 750.0
+    with pytest.raises(LookupError, match="2 channels or epochs"):
+        read_part(path)
+    with pytest.raises(LookupError, match=r"No channel XY.MYSTN.00.BHZ .*HHN, "):
+        read_part(path, "XY.MYSTN.00.BHZ")
+
+
+def test_read_part_refuses_what_obspy_cannot_read(tmp_path):
+    path = tmp_path / "notes.txt"
+    path.write_text("not a response")
+
+    with pytest.raises(ValueError, match="Unknown format"):
+        read_part(path)
+    with pytest.raises(FileNotFoundError):
+        read_part(tmp_path / "missing.xml")
+
+
+def test_placeholder_inventory_has_the_shape_of_the_service():
+    service = obspy.read_inventory(DATA_DIR / "nrl_part_centaur.xml")
+    response = service[0][0][0].response
+
+    inventory = placeholder_inventory(response, 100.0)
+
+    [network] = inventory
+    [station] = network
+    [channel] = station
+    expected = service[0][0][0]
+    assert (network.code, station.code) == (service[0].code, service[0][0].code)
+    assert (channel.code, channel.location_code) == (
+        expected.code,
+        expected.location_code,
+    )
+    assert channel.start_date == expected.start_date
+    assert channel.sample_rate == 100.0
+    assert channel.response is response

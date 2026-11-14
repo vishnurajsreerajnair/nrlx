@@ -7,8 +7,14 @@ from pathlib import Path
 
 import msgspec
 from obspy import Inventory
+from obspy.core.inventory.response import Response
 
-from nrlx.core.combine import cascade_instconfig, combine_params
+from nrlx.core.combine import (
+    cascade_instconfig,
+    combine_params,
+    combine_responses,
+    output_rate,
+)
 from nrlx.io.cache import (
     decode_catalog,
     decode_prefixes,
@@ -19,7 +25,12 @@ from nrlx.io.cache import (
     write_catalog,
     write_prefixes,
 )
-from nrlx.io.inventory import label_channels, read_stationxml, set_coordinates
+from nrlx.io.inventory import (
+    label_channels,
+    placeholder_inventory,
+    read_stationxml,
+    set_coordinates,
+)
 from nrlx.io.service import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, get
 from nrlx.models.catalog import Catalog, Found
 from nrlx.schema.prefixes import PrefixInput
@@ -151,6 +162,8 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
         *,
         sensor: list[str] | None = None,
         datalogger: list[str] | None = None,
+        sensor_response: Response | None = None,
+        datalogger_response: Response | None = None,
         integrated: list[str] | None = None,
         soh: list[str] | None = None,
         network: str | None = None,
@@ -163,17 +176,23 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
         longitude: float | None = None,
         elevation: float = 0.0,
         depth: float = 0.0,
-    ) -> Inventory:
+    ) -> tuple[Inventory, list[str]]:
         """Response of the parts, with a channel for each code, in an Inventory
 
         Each part is resolved in the catalog before the request, so that a part
-        matching no configuration or several fails without network. The service
-        builds the response once; each channel code is a copy of it, and the labels
-        and the place are set on them. See ResponseInput for the arguments.
+        matching no configuration or several fails without network. With NRL parts
+        only, the service builds the response; with a response from a file, the NRL
+        part is asked alone and nrlx combines the two (see combine_responses). Each
+        channel code is a copy of the response, and the labels and the place are
+        set on them. See ResponseInput for the arguments.
 
         Args:
             sensor: keys of the sensor, None without a sensor.
             datalogger: keys of the datalogger, None without a datalogger.
+            sensor_response: response of the sensor (or of a whole channel) in
+                place of its keys, None to select it by keys.
+            datalogger_response: response of the datalogger (or of a whole
+                channel) in place of its keys, None to select it by keys.
             integrated: keys of the integrated instrument, None without one.
             soh: keys of the state of health channel, None without one.
             network: network code, None for the service placeholder.
@@ -192,11 +211,12 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
                 coordinates.
 
         Returns:
-            obspy inventory with the channels.
+            obspy inventory with the channels, and the notes on what the
+            combination by nrlx filled or corrected (empty with NRL parts only).
 
         Raises:
-            ValueError: if the request is invalid (see ResponseInput), or a
-                condition name stands for several parameters.
+            ValueError: if the request is invalid (see ResponseInput), a condition
+                name stands for several parameters, or the parts do not combine.
             LookupError: if a part matches no configuration, or more than one.
             httpx.HTTPError: if the service cannot be reached or answers with an
                 error status.
@@ -206,6 +226,8 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
         request = ResponseInput(
             sensor=sensor,
             datalogger=datalogger,
+            sensor_response=sensor_response,
+            datalogger_response=datalogger_response,
             integrated=integrated,
             soh=soh,
             network=network,
@@ -231,12 +253,33 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             ]
             if keys is not None
         ]
-        params = combine_params(cascade_instconfig(instconfigs))
-        content = get(self.base_url, "combine", params, self.timeout)
+        notes: list[str] = list()
+        if request.sensor_response is None and request.datalogger_response is None:
+            # NRL parts only: the service combines them
+            params = combine_params(cascade_instconfig(instconfigs))
+            content = get(self.base_url, "combine", params, self.timeout)
+            built = read_stationxml(content)
+        else:
+            # the NRL part alone from the service (its instconfig is the only one),
+            # then combined by nrlx
+            sensor_part = (
+                request.sensor_response
+                if request.sensor_response is not None
+                else self.part(instconfigs[0])
+            )
+            datalogger_part = (
+                request.datalogger_response
+                if request.datalogger_response is not None
+                else self.part(instconfigs[0])
+            )
+            combined, notes = combine_responses(sensor_part, datalogger_part)
+            built = placeholder_inventory(
+                combined, output_rate(combined.response_stages)
+            )
 
         # a channel for each code, labelled, then placed
         inventory = label_channels(
-            read_stationxml(content),
+            built,
             request.network,
             request.station,
             request.location,
@@ -253,4 +296,25 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
                 request.depth,
             )
 
-        return inventory
+        return inventory, notes
+
+    def part(self, instconfig: str) -> Response:
+        """Response of a single part of the NRL, from the service
+
+        Args:
+            instconfig: exact instconfig of the part.
+
+        Returns:
+            the response of the channel the service answers.
+
+        Raises:
+            httpx.HTTPError: if the service cannot be reached or answers with an
+                error status.
+
+
+        """
+        params = combine_params(cascade_instconfig([instconfig]))
+        content = get(self.base_url, "combine", params, self.timeout)
+        response = read_stationxml(content)[0][0][0].response
+
+        return response

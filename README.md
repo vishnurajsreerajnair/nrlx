@@ -126,7 +126,10 @@ nrlx response --sensor streckeisen,STS-2,EG3,SG=1500 \
 Everything the CLI does is a thin layer over the `nrlx` package:
 
 ```python
+from pathlib import Path
+
 from nrlx import Nrlx, write_resp
+from nrlx.io.inventory import read_part
 
 nrl = Nrlx.from_cache()                      # the catalog and code table on disk
 # nrl = Nrlx.sync()                          # or download fresh ones first
@@ -138,11 +141,20 @@ for element, manufacturer, model, configuration in found.rows:
 print(found.varying)                         # {"Long-Period_Corner": ["1 s", ...], ...}
 
 # Build: each part resolves to one configuration, then one request
-inventory = nrl.response(
+inventory, notes = nrl.response(
     sensor=["luni", "tellus", "LP=1"],
     datalogger=["centaur", "FR=100", "FV=40Vpp", "DF=Off", "FP=Linear"],
     network="XY", station="TST", location="00", channels=["HHZ", "HHN", "HHE"],
     latitude=45.6, longitude=8.9,
+)
+
+# Your own sensor (any file obspy reads) with an NRL datalogger, combined by nrlx;
+# the notes say what it filled or corrected
+sensor = read_part(Path("my_sensor.xml"), "XX.SENS..HHZ")
+inventory, notes = nrl.response(
+    sensor_response=sensor,
+    datalogger=["centaur", "FR=100", "FV=40Vpp", "DF=Off", "FP=Linear"],
+    channels=["HHZ"],
 )
 
 inventory.write("station.xml", format="STATIONXML")   # an obspy Inventory

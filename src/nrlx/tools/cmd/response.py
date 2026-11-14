@@ -321,7 +321,7 @@ def write(
 
     parts = {part: partkeys for part, partkeys in given}
     try:
-        inventory = nrl.response(
+        inventory, combined = nrl.response(
             sensor=parts.get("sensor"),
             datalogger=parts.get("datalogger"),
             integrated=parts.get("integrated"),
@@ -370,8 +370,9 @@ def write(
         errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
         raise typer.Exit(code=1) from err
 
-    # the channel codes the SEED norm would name otherwise, as a note
-    notes = [
+    # what the combination filled or corrected, and the channel codes the SEED norm
+    # would name otherwise, as notes
+    notes = [f"note: {note}" for note in combined] + [
         f"note: {channel.code} at {channel.sample_rate:g} sps, the SEED norm "
         f"gives the band {' or '.join(band_codes(channel.sample_rate))}"
         for channel in inventory[0][0]
