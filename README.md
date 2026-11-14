@@ -121,6 +121,25 @@ nrlx response --sensor streckeisen,STS-2,EG3,SG=1500 \
   place (`--latitude`, `--longitude` in degrees; `--elevation` and `--depth` in
   metres, 0 unless given). The labels not given keep the service placeholders.
 
+### Your own sensor or datalogger
+
+```bash
+nrlx response --sensor-file my_sensor.xml#XX.SENS..HHZ \
+  --datalogger centaur,FR=100,FV=40Vpp,DF=Off,FP=Linear \
+  --network XY --station TST --channels HHZ -o station.xml
+```
+
+- `--sensor-file` and `--datalogger-file` take the part from any file obspy
+  reads (StationXML, RESP, dataless SEED), in place of `--sensor` or
+  `--datalogger`; `FILE#NET.STA.LOC.CHA` picks a channel of a file with several.
+  The file can hold the part alone or a whole channel: the sensor is taken up to
+  its voltage output, the datalogger from its voltage input.
+- The other part comes from the NRL by keys as usual (or from a file too), and
+  nrlx combines the two itself: it chains the units at the voltage, corrects the
+  normalization factors that contradict their gains, and computes the overall
+  sensitivity as obspy does. Notes say what was filled or corrected.
+- `-i` asks the NRL parts only, so it does not take a file.
+
 ## Python library
 
 Everything the CLI does is a thin layer over the `nrlx` package:
@@ -172,10 +191,10 @@ offline.
 
 Working end to end against the live NRL v2 service (released 0.2.x on PyPI; 0.1.0
 was an early skeleton, yanked): finding by keys and conditions, sensor and
-datalogger combination, StationXML and RESP writing with any channel codes, and
-the structural `doctor` check. Planned next: a local copy of the NRL repository,
-format conversion, deeper doctor checks, local sensor assets, and combining any
-sensor and datalogger responses. See [CHANGELOG.md](CHANGELOG.md) for details.
+datalogger combination (also with your own sensor or datalogger files),
+StationXML and RESP writing with any channel codes, and the structural `doctor`
+check. Planned next: a local copy of the NRL repository, format conversion,
+deeper doctor checks and local sensor assets. See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Note for developers
 

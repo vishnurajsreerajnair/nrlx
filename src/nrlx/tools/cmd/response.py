@@ -10,6 +10,7 @@ from typing import Annotated
 import httpx
 import typer
 from obspy import Inventory
+from obspy.core.inventory.response import Response
 from rich.console import Console
 from rich.markup import escape
 from rich.panel import Panel
@@ -18,11 +19,13 @@ from rich.table import Table
 
 from nrlx.core.matching import varying_values
 from nrlx.core.seed import band_codes
+from nrlx.io.inventory import read_part
 from nrlx.io.resp import write_resp
 from nrlx.io.service import DEFAULT_BASE_URL
 from nrlx.models.catalog import Found
 from nrlx.models.nrlx import Nrlx
 from nrlx.schema.prefixes import PrefixInput
+from nrlx.schema.response import ResponseInput
 
 console = Console()
 errconsole = Console(stderr=True)
@@ -64,6 +67,20 @@ def response(
     datalogger: Annotated[
         list[str] | None,
         typer.Option("--datalogger", help="Keys of the datalogger."),
+    ] = None,
+    sensor_file: Annotated[
+        str | None,
+        typer.Option(
+            "--sensor-file",
+            help="Response of the sensor from a file obspy reads, in place of "
+            "--sensor: FILE, or FILE#NET.STA.LOC.CHA for one of its channels.",
+        ),
+    ] = None,
+    datalogger_file: Annotated[
+        str | None,
+        typer.Option(
+            "--datalogger-file", help="Same as --sensor-file, for the datalogger."
+        ),
     ] = None,
     integrated: Annotated[
         list[str] | None,
@@ -146,7 +163,8 @@ def response(
     --datalogger, --integrated, --soh) its matches and the parameters that still
     vary. Add keys until each part matches one configuration, then add -o FILE
     to write it. -i asks the parts and labels step by step and prints the same
-    command line.
+    command line. The sensor or the datalogger can come from a file instead
+    (--sensor-file, --datalogger-file), combined by nrlx with the other part.
 
     Example:
 
@@ -162,6 +180,31 @@ def response(
         errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
         raise typer.Exit(code=1) from err
 
+    # -i asks the NRL parts only
+    if interactive and (sensor_file is not None or datalogger_file is not None):
+        errconsole.print(
+            "[bold red]Error:[/bold red] -i asks the NRL parts: give the files "
+            "without -i."
+        )
+        raise typer.Exit(code=1)
+
+    # the parts from files, read before anything else
+    try:
+        sensor_response = read_file_option(sensor_file)
+        datalogger_response = read_file_option(datalogger_file)
+    except (OSError, ValueError, LookupError) as err:
+        errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
+        raise typer.Exit(code=1) from err
+    from_files = [
+        (part, value, partresponse)
+        for part, value, partresponse in [
+            ("sensor", sensor_file, sensor_response),
+            ("datalogger", datalogger_file, datalogger_response),
+        ]
+        if value is not None and partresponse is not None
+    ]
+    files = [(part, value) for part, value, _ in from_files]
+
     # the interactive mode asks what the options give
     selections = [
         ("sensor", split_keys(sensor)),
@@ -172,30 +215,59 @@ def response(
     codes = split_keys(channels) or []
     if interactive:
         selections, network, station, location, codes, output = ask(nrl)
-        line = command_line(selections, network, station, location, codes, output)
+        line = command_line(
+            selections, files, network, station, location, codes, output
+        )
         console.print(
             f"\nThe same from the command line:\n{escape(line)}\n", soft_wrap=True
         )
     given = [(part, partkeys) for part, partkeys in selections if partkeys is not None]
 
     # bare keys explore; the parts are what -o writes
-    if keys and given:
+    if keys and (given or files):
         errconsole.print(
             "[bold red]Error:[/bold red] Keys without a part only explore: put them "
             "in --sensor, --datalogger, --integrated or --soh."
         )
         raise typer.Exit(code=1)
-    if output is not None and not given:
+    if output is not None and not (given or files):
         errconsole.print(
             "[bold red]Error:[/bold red] Writing needs a part: --sensor, "
-            "--datalogger, --integrated or --soh."
+            "--datalogger, --integrated, --soh, or a file with --sensor-file or "
+            "--datalogger-file."
         )
         raise typer.Exit(code=1)
 
+    # the rules of the parts, the labels and the place, before any table
+    if given or files:
+        parts = {part: partkeys for part, partkeys in given}
+        try:
+            ResponseInput(
+                sensor=parts.get("sensor"),
+                datalogger=parts.get("datalogger"),
+                sensor_response=sensor_response,
+                datalogger_response=datalogger_response,
+                integrated=parts.get("integrated"),
+                soh=parts.get("soh"),
+                network=network,
+                station=station,
+                location=location,
+                channels=codes,
+                starttime=starttime,
+                endtime=endtime,
+                latitude=latitude,
+                longitude=longitude,
+                elevation=elevation,
+                depth=depth,
+            )
+        except ValueError as err:
+            errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
+            raise typer.Exit(code=1) from err
+
     # the catalog, or what the bare keys match
-    if not given and not keys:
+    if not given and not files and not keys:
         show_tree(nrl)
-    elif not given:
+    elif not given and not files:
         try:
             found = nrl.find(split_keys(keys) or [], element)
         except ValueError as err:
@@ -205,7 +277,16 @@ def response(
         if not found.rows:
             raise typer.Exit(code=1)
     else:
-        # what each part matches, before any request
+        # the parts from files, then what each part by keys matches
+        for part, value, partresponse in from_files:
+            stages = partresponse.response_stages
+            summary = (
+                f"stages: {len(stages)}, {stages[0].input_units} to "
+                f"{stages[-1].output_units}"
+                if stages
+                else "no stages"
+            )
+            console.print(f"{part}: {escape(value)}, {escape(summary)}", soft_wrap=True)
         unique: list[tuple[str, str]] = list()
         for part, partkeys in given:
             try:
@@ -236,7 +317,7 @@ def response(
             exact: list[tuple[str, list[str] | None]] = [
                 (part, [instconfig]) for part, instconfig in unique
             ]
-            line = command_line(exact, network, station, location, codes, None)
+            line = command_line(exact, files, network, station, location, codes, None)
             console.print(
                 f"\nEvery part matches one configuration. Add -o FILE to write:\n"
                 f"{escape(line)} -o FILE",
@@ -246,6 +327,8 @@ def response(
             write(
                 nrl,
                 given,
+                sensor_response,
+                datalogger_response,
                 network,
                 station,
                 location,
@@ -265,6 +348,8 @@ def response(
 def write(
     nrl: Nrlx,
     given: list[tuple[str, list[str]]],
+    sensor_response: Response | None,
+    datalogger_response: Response | None,
     network: str | None,
     station: str | None,
     location: str | None,
@@ -279,11 +364,14 @@ def write(
     response_format: str | None,
     split: bool,
 ) -> None:
-    """Build the response with the service and write its file or files
+    """Build the response and write its file or files
 
     Args:
         nrl: catalog, code table and service.
         given: each part and its keys.
+        sensor_response: response of the sensor from a file, None for its keys.
+        datalogger_response: response of the datalogger from a file, None for its
+            keys.
         network: network code, None for the placeholder.
         station: station code, None for the placeholder.
         location: location code, None for the placeholder.
@@ -324,6 +412,8 @@ def write(
         inventory, combined = nrl.response(
             sensor=parts.get("sensor"),
             datalogger=parts.get("datalogger"),
+            sensor_response=sensor_response,
+            datalogger_response=datalogger_response,
             integrated=parts.get("integrated"),
             soh=parts.get("soh"),
             network=network,
@@ -550,6 +640,34 @@ def varying_line(varying: dict[str, list[str]], codes: dict[str, str]) -> str:
     return line
 
 
+def read_file_option(value: str | None) -> Response | None:
+    """Response of a part from the value of its file option
+
+    Args:
+        value: FILE, or FILE#NET.STA.LOC.CHA for one of its channels (split at the
+            last #); None without the option.
+
+    Returns:
+        the response, None without the option.
+
+    Raises:
+        OSError: if the file cannot be read.
+        ValueError: if obspy cannot read it, or the channel has no response.
+        LookupError: if no channel or several match.
+
+
+    """
+    match value.rpartition("#") if value is not None else None:
+        case None:
+            response = None
+        case (path, "#", seed_id):
+            response = read_part(Path(path), seed_id)
+        case (_, _, path):
+            response = read_part(Path(path))
+
+    return response
+
+
 def split_keys(values: list[str] | None) -> list[str] | None:
     """Keys of a repeated option, each split on its commas
 
@@ -570,6 +688,7 @@ def split_keys(values: list[str] | None) -> list[str] | None:
 
 def command_line(
     selections: list[tuple[str, list[str] | None]],
+    files: list[tuple[str, str]],
     network: str | None,
     station: str | None,
     location: str | None,
@@ -580,6 +699,8 @@ def command_line(
 
     Args:
         selections: each part and its keys, None when not given.
+        files: each part from a file and its option value, FILE or
+            FILE#NET.STA.LOC.CHA.
         network: network code, None when not given.
         station: station code, None when not given.
         location: location code, None when not given.
@@ -598,6 +719,7 @@ def command_line(
         if partkeys is not None
         for word in [f"--{part}", ",".join(partkeys)]
     ]
+    words += [word for part, value in files for word in [f"--{part}-file", value]]
     words += [
         word
         for option, value in [

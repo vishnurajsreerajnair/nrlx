@@ -24,7 +24,13 @@ command, `nrlx response`; the Python API changes as listed below.
   given, with a note when a band code does not fit the sample rate (SEED norm,
   `core.seed.band_codes`). `-i` asks the parts (manufacturer, model, then each
   varying parameter, with the questions of the code table), the labels and the
-  file, then prints the same command line and writes.
+  file, then prints the same command line and writes. `--sensor-file` and
+  `--datalogger-file` take a part from a file obspy reads (`FILE#NET.STA.LOC.CHA`
+  for one of its channels), combined by nrlx with the other part, by keys or from
+  a file; each file part is shown with its stages and units, and the printed
+  command line keeps the file options. The rules of the parts, the labels, the
+  times and the place (`ResponseInput`) are checked before any table, so a wrong
+  request fails before suggesting `-o FILE`; `-i` refuses the file options.
 - `core.matching.varying_values`, the values of each parameter that differs
   between configurations.
 - **Combination of any sensor and datalogger responses**, done by nrlx instead of

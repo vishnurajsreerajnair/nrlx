@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import obspy
+import pytest
 from typer.testing import CliRunner
 
 from nrlx.tools.cmd import app
 
 runner = CliRunner()
+
+DATA_DIR = Path(__file__).parents[2] / "data"
 
 SENSOR = "sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel"
 DATALOGGER = "datalogger_Quanterra_Q330_FV40Vpp_FR100"
@@ -324,3 +328,179 @@ def test_response_interactive_takes_the_only_options(
     assert "Q330 (the only one)" in result.output
     assert f"--datalogger {DATALOGGER}" in result.output
     assert output.exists()
+
+
+# parts from files
+def test_response_sensor_file_with_datalogger_keys_prints_the_line(
+    cache_root, fake_service
+):
+    sensor = DATA_DIR / "nrl_part_ea120.xml"
+
+    result = runner.invoke(
+        app,
+        [
+            "response",
+            "--sensor-file",
+            str(sensor),
+            "--datalogger",
+            "Q330",
+            "--cache-root",
+            str(cache_root),
+        ],
+        terminal_width=300,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert f"sensor: {sensor}, stages: 1, m/s**2 to V" in result.output
+    assert "Every part matches one configuration" in result.output
+    assert f"--datalogger {DATALOGGER} --sensor-file {sensor} -o FILE" in (
+        result.output
+    )
+    assert fake_service.requests == []
+
+
+def test_response_sensor_file_with_datalogger_keys_writes(
+    cache_root, fake_service, tmp_path
+):
+    fake_service.contents["combine"] = (DATA_DIR / "nrl_part_q330hr.xml").read_bytes()
+    output = tmp_path / "st.xml"
+
+    result = runner.invoke(
+        app,
+        [
+            "response",
+            "--sensor-file",
+            str(DATA_DIR / "nrl_part_ea120.xml"),
+            "--datalogger",
+            "Q330",
+            "--channels",
+            "HNZ",
+            "-o",
+            str(output),
+            "--cache-root",
+            str(cache_root),
+        ],
+        terminal_width=300,
+    )
+
+    # the datalogger asked alone, the Eentec normalization corrected
+    assert result.exit_code == 0, result.output
+    [request] = fake_service.requests
+    assert request.params is not None
+    assert request.params["instconfig"] == DATALOGGER
+    assert "note: stage 1: normalization factor corrected by x1.99876" in (
+        result.output
+    )
+    [channel] = obspy.read_inventory(output)[0][0]
+    assert channel.code == "HNZ"
+    assert channel.response.instrument_sensitivity.input_units == "m/s**2"
+
+
+def test_response_two_files_write_without_the_service(
+    cache_root, fake_service, tmp_path
+):
+    output = tmp_path / "st.resp"
+
+    result = runner.invoke(
+        app,
+        [
+            "response",
+            "--sensor-file",
+            str(DATA_DIR / "nrl_part_sts2.xml"),
+            "--datalogger-file",
+            str(DATA_DIR / "nrl_part_centaur.xml"),
+            "-o",
+            str(output),
+            "--cache-root",
+            str(cache_root),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert fake_service.requests == []
+    assert "Response written (resp)" in result.output
+    assert len(obspy.read_inventory(output)[0][0][0].response.response_stages) > 1
+
+
+def test_response_file_picks_a_channel(cache_root, fake_service, tmp_path):
+    # a file with two channels, the second with half the gain
+    two = tmp_path / "two.xml"
+    inventory = obspy.read_inventory(DATA_DIR / "nrl_part_sts2.xml")
+    channel = inventory[0][0][0].copy()
+    channel.code = "HHN"
+    channel.response.response_stages[0].stage_gain /= 2.0
+    inventory[0][0].channels.append(channel)
+    inventory.write(str(two), format="STATIONXML")
+    seedid = f"{inventory[0].code}.{inventory[0][0].code}.{channel.location_code}.HHN"
+    arguments = ["response", "--datalogger", "Q330", "--cache-root", str(cache_root)]
+
+    picked = runner.invoke(app, [*arguments, "--sensor-file", f"{two}#{seedid}"])
+    several = runner.invoke(app, [*arguments, "--sensor-file", str(two)])
+
+    assert picked.exit_code == 0, picked.output
+    assert several.exit_code == 1
+    assert "2 channels or epochs" in several.output
+
+
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        (["--sensor", "STS-1", "--datalogger", "Q330"], "keys or by a response"),
+        ([], "combined with the other part"),
+        (["--integrated", "Q330"], "go as a sensor"),
+        (["--datalogger", "Q330", "-i"], "-i asks the NRL parts"),
+    ],
+)
+def test_response_file_parts_follow_the_rules_before_any_table(
+    cache_root, fake_service, options, message
+):
+    result = runner.invoke(
+        app,
+        [
+            "response",
+            "--sensor-file",
+            str(DATA_DIR / "nrl_part_sts2.xml"),
+            *options,
+            "--cache-root",
+            str(cache_root),
+        ],
+        terminal_width=300,
+    )
+
+    assert result.exit_code == 1
+    assert message in result.output
+    assert "configuration" not in result.output
+    assert fake_service.requests == []
+
+
+def test_response_unreadable_file(cache_root, tmp_path):
+    notes = tmp_path / "notes.txt"
+    notes.write_text("not a response")
+    arguments = ["response", "--datalogger", "Q330", "--cache-root", str(cache_root)]
+
+    unknown = runner.invoke(app, [*arguments, "--sensor-file", str(notes)])
+    missing = runner.invoke(app, [*arguments, "--sensor-file", str(tmp_path / "x")])
+
+    assert unknown.exit_code == 1
+    assert "Unknown format" in " ".join(unknown.output.split())
+    assert missing.exit_code == 1
+    assert "No such file" in missing.output
+
+
+def test_response_checks_the_labels_before_any_table(cache_root, fake_service):
+    result = runner.invoke(
+        app,
+        [
+            "response",
+            "--sensor",
+            "STS-1",
+            "--channels",
+            "HHZ,HHZ",
+            "--cache-root",
+            str(cache_root),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "The channels must be unique" in result.output
+    assert "configuration" not in result.output
