@@ -27,6 +27,29 @@ command, `nrlx response`; the Python API changes as listed below.
   file, then prints the same command line and writes.
 - `core.matching.varying_values`, the values of each parameter that differs
   between configurations.
+- **Combination of any sensor and datalogger responses**, done by nrlx instead of
+  the service: `core.combine.combine_responses(sensor, datalogger)` returns the
+  combined obspy `Response` and notes. The sensor stages go up to the first stage
+  with a voltage output and the datalogger stages start at the first with a
+  voltage or empty input, so whole channels work as either part; an empty unit at
+  the join takes the other side's (as the service does) and two different units
+  are refused; the stages are renumbered; a polynomial sensor gives a polynomial
+  divided by the powers of the datalogger gain. The poles and zeros are
+  normalized to their stated gains: 12 % of the NRL sensors have a normalization
+  factor that contradicts their gain by more than 1 % (every Eentec EA-140 by a
+  factor 2, a REFTEK RT131A-02 by 8.8), which obspy applies as written when the
+  channel sensitivity is at the sensor's frequency. The overall sensitivity is at
+  the sensor's normalization frequency, at most a tenth of the output rate (the
+  sensor's 1 Hz is out of band at 1 sps). Checked against the service on real NRL
+  parts (same stages) and against obspy on 300 random NRL pairs (the
+  sensitivity obspy computes from the written file equals nrlx's to 1e-14).
+- `core.gain`: the amplitude of the response stages computed directly, with the
+  rules of evalresp (poles and zeros analog and digital, FIR plain and symmetric,
+  filters with denominator, response lists, gain-only stages; a stage is
+  renormalized to its gain when its frequency is not the sensitivity frequency, a
+  FIR more than 2 % from normalized is divided by its sum), so that a sensitivity
+  computed by nrlx is the one obspy deconvolves with. `response_amplitude(stages,
+  frequency)` is the overall sensitivity.
 - msgspec structs of the NRL service JSON: `schema.catalog` (the `/catalog` tree),
   `schema.cache.CatalogFileInput` (the catalog file) and `schema.prefixes` (the
   `/prefix-lookup` table). The catalog is decoded and validated in one step, and
