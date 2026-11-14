@@ -34,6 +34,9 @@ MAX_RATE_FRACTION = 0.1
 # below this fraction of its gain, the sensor is out of its flat band
 FLAT_BAND_FRACTION = 0.5
 
+# a stated sensitivity this far from its stages is noted
+SENSITIVITY_NOTED = 1e-3
+
 
 def cascade_instconfig(instconfigs: list[str]) -> str:
     """instconfig of a response: the instconfigs of its parts, cascaded
@@ -402,3 +405,55 @@ def combine_responses(
             )
 
     return combined, notes
+
+
+def received_notes(response: Response) -> list[str]:
+    """Notes on a response kept as the NRL gives it: normalization factors that
+    contradict their gains, and a stated sensitivity that its stages do not give
+
+    Args:
+        response: response of the service, or of a file of the local copy.
+
+    Returns:
+        the notes, empty when the response is consistent.
+
+
+    """
+    notes = list()
+
+    # each poles and zeros stage worth its gain at its normalization frequency
+    for stage in response.response_stages:
+        if isinstance(stage, PolesZerosResponseStage):
+            frequency = float(stage.normalization_frequency)
+            value = abs(transfer(stage, frequency))
+            if value and abs(value - 1.0) > NORMALIZATION_NOTED:
+                notes.append(
+                    f"stage {stage.stage_sequence_number}: the normalization factor "
+                    f"gives x{value:.6g} of its gain {float(stage.stage_gain):g} at "
+                    f"{frequency:g} Hz, kept as received (obspy lets the gain win "
+                    f"unless the sensitivity is at {frequency:g} Hz); a combination "
+                    "by nrlx corrects it"
+                )
+
+    # the stated sensitivity against the one of the stages
+    sensitivity = response.instrument_sensitivity
+    computed = None
+    if sensitivity is not None and response.response_stages:
+        try:
+            computed = response_amplitude(
+                response.response_stages, float(sensitivity.frequency)
+            )
+        except ValueError as err:
+            notes.append(f"the sensitivity cannot be checked: {err}")
+    if sensitivity is not None and computed:
+        ratio = float(sensitivity.value) / computed
+        if abs(ratio - 1.0) > SENSITIVITY_NOTED:
+            notes.append(
+                f"the stated sensitivity {float(sensitivity.value):g} at "
+                f"{float(sensitivity.frequency):g} Hz is x{ratio:.4g} what the stages "
+                f"give ({computed:.6g}): remove_response uses the stages, "
+                "remove_sensitivity the stated value; a combination by nrlx "
+                "recomputes it"
+            )
+
+    return notes

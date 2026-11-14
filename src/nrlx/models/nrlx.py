@@ -15,6 +15,7 @@ from nrlx.core.combine import (
     combine_params,
     combine_responses,
     output_rate,
+    received_notes,
 )
 from nrlx.io.cache import (
     decode_catalog,
@@ -319,8 +320,9 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
                 coordinates.
 
         Returns:
-            obspy inventory with the channels, and the notes on what the
-            combination by nrlx filled or corrected (empty with NRL parts only).
+            obspy inventory with the channels, and the notes: on what the
+            combination by nrlx filled or corrected, or on the response kept as
+            received (see received_notes).
 
         Raises:
             ValueError: if the request is invalid (see ResponseInput), a condition
@@ -374,9 +376,11 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
                 params = combine_params(cascade_instconfig(instconfigs))
                 content = get(self.base_url, "combine", params, self.timeout)
                 built = read_stationxml(content)
+                notes = received_notes(built[0][0][0].response)
             case ("local", False, [instconfig]):
                 # a part alone: its file, as the service gives it
                 built = read_stationxml(self.local_file(instconfig).read_bytes())
+                notes = received_notes(built[0][0][0].response)
             case _:
                 # a sensor and a datalogger combined by nrlx: the sensor is the
                 # first instconfig, the datalogger the last

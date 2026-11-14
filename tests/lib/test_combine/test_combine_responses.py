@@ -9,9 +9,12 @@ import pytest
 from obspy import Inventory
 from obspy.core.inventory import Channel, Network, Station
 from obspy.core.inventory.response import (
+    InstrumentSensitivity,
     PolesZerosResponseStage,
     PolynomialResponseStage,
     Response,
+    ResponseListElement,
+    ResponseListResponseStage,
     ResponseStage,
 )
 
@@ -19,6 +22,7 @@ from nrlx.core.combine import (
     combine_responses,
     datalogger_stages,
     output_rate,
+    received_notes,
     sensitivity_frequency,
     sensor_stages,
 )
@@ -236,3 +240,51 @@ def test_a_broadband_sensor_on_a_slow_channel_stays_in_its_flat_band():
     _, notes = sensitivity_frequency(stages, stages, 1.0)
 
     assert len(notes) == 1
+
+
+# responses kept as received
+def test_received_notes_of_a_consistent_response():
+    assert received_notes(read("nrl_sts2_q330")) == []
+    assert received_notes(read("nrl_poly")) == []
+
+
+def test_received_notes_of_a_factor_that_contradicts_its_gain():
+    notes = received_notes(read("nrl_ea120_centaur"))
+
+    assert notes == [
+        "stage 1: the normalization factor gives x0.500311 of its gain 0.5099 at "
+        "1 Hz, kept as received (obspy lets the gain win unless the sensitivity is "
+        "at 1 Hz); a combination by nrlx corrects it"
+    ]
+
+
+def test_received_notes_of_a_stated_sensitivity_its_stages_do_not_give():
+    response = read("nrl_sts2_q330")
+    response.instrument_sensitivity.value *= 3.0
+
+    [note] = received_notes(response)
+
+    assert note.startswith("the stated sensitivity ")
+    assert "is x3 what the stages give" in note
+    assert note.endswith("a combination by nrlx recomputes it")
+
+
+def test_received_notes_when_the_sensitivity_cannot_be_checked():
+    stage = ResponseListResponseStage(
+        1,
+        1.0,
+        1.0,
+        "M/S",
+        "V",
+        response_list_elements=[
+            ResponseListElement(frequency, 1.0, 0.0) for frequency in [0.1, 0.5]
+        ],
+    )
+    response = Response(
+        response_stages=[stage],
+        instrument_sensitivity=InstrumentSensitivity(1.0, 1.0, "M/S", "V"),
+    )
+
+    [note] = received_notes(response)
+
+    assert note.startswith("the sensitivity cannot be checked: 1 Hz is outside")

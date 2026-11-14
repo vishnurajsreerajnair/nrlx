@@ -284,3 +284,28 @@ def test_response_from_a_missing_local_copy(nrl, catalog, prefixes, tmp_path):
     synced = Nrlx(catalog=catalog, prefixes=prefixes, local_tree=tmp_path / "NRL")
     with pytest.raises(FileNotFoundError, match="STS-1_LP360 is not in the local"):
         synced.response(sensor=["STS-1"], source="local")
+
+
+def test_response_of_the_service_notes_what_it_keeps_as_received(nrl, fake_service):
+    fake_service.contents["combine"] = (DATA_DIR / "nrl_ea120_centaur.xml").read_bytes()
+
+    _, notes = nrl.response(sensor=["STS-2", "SG=1500"], datalogger=["Q330"])
+
+    assert [note.split(":")[0] for note in notes] == ["stage 1"]
+    assert "kept as received" in notes[0]
+
+
+def test_response_of_a_local_part_alone_notes_what_it_keeps(
+    catalog, prefixes, tmp_path, fake_service
+):
+    # the EA-120 + Centaur channel as the file of the STS-2
+    tree = tmp_path / "NRL"
+    part = tree / "sensor" / "Streckeisen" / "STS-2_EG3_SG1500_LP120_STgroundVel.xml"
+    part.parent.mkdir(parents=True)
+    part.write_bytes((DATA_DIR / "nrl_ea120_centaur.xml").read_bytes())
+    nrl = Nrlx(catalog=catalog, prefixes=prefixes, local_tree=tree)
+
+    _, notes = nrl.response(sensor=["STS-2", "SG=1500"], source="local")
+
+    assert fake_service.requests == []
+    assert "kept as received" in notes[0]

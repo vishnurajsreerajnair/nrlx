@@ -31,6 +31,14 @@ command, `nrlx response`; the Python API changes as listed below.
   command line keeps the file options. The rules of the parts, the labels, the
   times and the place (`ResponseInput`) are checked before any table, so a wrong
   request fails before suggesting `-o FILE`; `-i` refuses the file options.
+- **Notes on the responses kept as received**, `core.combine.received_notes`:
+  the responses nrlx does not combine itself (the service's, and a part alone
+  from the local copy) are written as the NRL gives them, and `Nrlx.response`
+  returns a note for each poles and zeros stage whose normalization factor does
+  not give its gain at its normalization frequency (more than 0.1 %), and when the
+  stated sensitivity differs from the one of the stages by more than 0.1 %
+  (`SENSITIVITY_NOTED`; for example an HG-7 on a GaiaCode TAU at 8 sps, stated
+  x3.64 what its stages give). The command prints them as the other notes.
 - **Local copy of the NRL**, `nrlx local sync|status|remove`. `sync` downloads
   the catalog, the code table and the zip of the whole NRL (`/combine` with
   `instconfig=full_NRL_v2_zip`, about 300 MB, streamed to disk by

@@ -121,6 +121,10 @@ nrlx response --sensor streckeisen,STS-2,EG3,SG=1500 \
   the network, station, location, times (`--starttime`, `--endtime`, UTC) and the
   place (`--latitude`, `--longitude` in degrees; `--elevation` and `--depth` in
   metres, 0 unless given). The labels not given keep the service placeholders.
+- A response nrlx does not combine itself (the service's, or a part alone from
+  the local copy) is written as received, with a note when it contradicts itself:
+  a normalization factor that does not give its stage's gain (12 % of the NRL
+  sensors), or a stated sensitivity its stages do not give (more than 0.1 %).
 
 ### Your own sensor or datalogger
 
