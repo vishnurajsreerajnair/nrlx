@@ -1,0 +1,35 @@
+#
+###################################################################################
+#
+B050F03     Station:     YY
+B050F16     Network:     XX
+B052F03     Location:    00
+B052F04     Channel:     ZZZ
+B052F22     Start date:  1970,001,00:00:00
+B052F23     End date:    No Ending Time
+#
+# ModuleURI=https://ws-nrlservice.prod.earthscope.org/irisws/nrl/1/combine?format=resp&instconfig=sensor_GenericUnity_UnityPolynomialPA_FL0_FU1_AL-2000_AU2000
+#
+#                  +-----------------------------------+
+#                  |       Response (Polynomial)       |
+#                  |        XX  YY     00  ZZZ         |
+#                  |    01/01/1970 to No Ending Time   |
+#                  +-----------------------------------+
+#
+B062F03     Transfer function type:                P
+B062F04     Stage sequence number:                 0
+B062F05     Response in units lookup:              Pa - Pascals
+B062F06     Response out units lookup:             V - Volts
+B062F07     Polynomial Approximation Type:         M
+B062F08     Valid Frequency Units:                 B
+B062F09     Lower Valid Frequency Bound:           +0.00000E+00
+B062F10     Upper Valid Frequency Bound:           +1.00000E+00
+B062F11     Lower Bound of Approximation:          -2.00000E+03
+B062F12     Upper Bound of Approximation:          +2.00000E+03
+B062F13     Maximum Absolute Error:                +1.00000E-02
+B062F14     Number of Coefficients:                2
+#              Polynomial coefficients:
+#              i, coefficient,  error
+B062F15-16     0   +0.00000E+00  +0.00000E+00
+B062F15-16     1   +1.00000E+00  +0.00000E+00
+

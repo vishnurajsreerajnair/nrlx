@@ -18,6 +18,7 @@ from obspy.core.inventory.response import (
 from nrlx.io.cache import decode_catalog, decode_prefixes
 from nrlx.models.catalog import Catalog
 from nrlx.models.nrlx import Nrlx
+from nrlx.schema.prefixes import PrefixInput
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -118,9 +119,15 @@ def cache_root(tmp_path, catalog_content, prefixes_content) -> Path:
 
 
 @pytest.fixture
-def nrl(catalog, prefixes_content) -> Nrlx:
+def prefixes(prefixes_content) -> list[PrefixInput]:
+    """The decoded code table of prefixes_content"""
+    return decode_prefixes(prefixes_content)
+
+
+@pytest.fixture
+def nrl(catalog, prefixes) -> Nrlx:
     """Nrlx with the catalog and the code table, on the default service"""
-    return Nrlx(catalog=catalog, prefixes=decode_prefixes(prefixes_content))
+    return Nrlx(catalog=catalog, prefixes=prefixes)
 
 
 # responses

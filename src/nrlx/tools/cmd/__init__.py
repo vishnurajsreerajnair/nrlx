@@ -7,10 +7,9 @@ from typing import Annotated
 import typer
 
 import nrlx
-from nrlx.tools.cmd.browse import app as browseapp
-from nrlx.tools.cmd.build import build
 from nrlx.tools.cmd.catalog import prefixes, status, sync
 from nrlx.tools.cmd.doctor import doctor
+from nrlx.tools.cmd.response import response
 
 app = typer.Typer(
     name="nrlx",
@@ -46,6 +45,5 @@ def main(
 app.command()(status)
 app.command()(sync)
 app.command()(prefixes)
-app.add_typer(browseapp, name="browse")
-app.command()(build)
+app.command()(response)
 app.command()(doctor)

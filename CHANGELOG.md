@@ -5,11 +5,28 @@
 The package is restructured in layers, as in isamgeo-seismic-tools: `schema`
 (msgspec structs of every input), `models` (the structs with their methods), `core`
 (pure functions), `io` (service, cache, obspy) and `tools/cmd` (the commands, the
-only place that prints and exits). The CLI flags are unchanged; the Python API
-changes as listed below.
+only place that prints and exits). `nrlx browse` and `nrlx build` become one
+command, `nrlx response`; the Python API changes as listed below.
 
 ### Added
 
+- **`nrlx response`**, the command finding and writing responses, in place of
+  `nrlx browse` and `nrlx build`. Without keys it shows the catalog; bare keys
+  (`--element` to narrow) explore every element; the parts `--sensor`,
+  `--datalogger`, `--integrated` and `--soh` take keys, comma-separated or
+  repeated. What matches is shown by how many: more than 20 grouped by model with
+  the parameters that still vary (by code), up to 20 one per row, one in full with
+  every parameter; notes on loose words, hints when nothing matches (exit 1). When
+  every part matches one configuration it prints the command line with the
+  instconfigs; with `-o FILE` it writes the response, `.xml` for StationXML or
+  `.resp` for RESP (`--format` overrides), every channel in one file or one per
+  channel with `--split` (`st_XY.TST.00.HHZ.xml`). `--channels` are written as
+  given, with a note when a band code does not fit the sample rate (SEED norm,
+  `core.seed.band_codes`). `-i` asks the parts (manufacturer, model, then each
+  varying parameter, with the questions of the code table), the labels and the
+  file, then prints the same command line and writes.
+- `core.matching.varying_values`, the values of each parameter that differs
+  between configurations.
 - msgspec structs of the NRL service JSON: `schema.catalog` (the `/catalog` tree),
   `schema.cache.CatalogFileInput` (the catalog file) and `schema.prefixes` (the
   `/prefix-lookup` table). The catalog is decoded and validated in one step, and
@@ -36,6 +53,27 @@ changes as listed below.
   `BuildInput`. They are written on the station and on every channel of each
   StationXML (`io.inventory.set_coordinates`), merged or one per channel, instead
   of the service placeholders; they need the stationxml format, not zipped.
+- **`Nrlx.response(...)`** returns an obspy `Inventory`: each part (`sensor`,
+  `datalogger`, `integrated`, `soh`) selected by keys and resolved before any
+  request, one `/combine` request, a copy of the channel for each code (written as
+  given), and the network, station, location, times and coordinates set by nrlx
+  (the labels not given keep the service placeholders). Its request is
+  `schema.response.ResponseInput`, which checks the parts (a sensor, a datalogger
+  or both, an integrated or a state of health channel alone), the channels, the
+  times and the coordinates. `Nrlx.find(keys, element)` is `Catalog.find` with the
+  code table. `io.inventory.label_channels` labels the channels, and
+  `set_coordinates` works on an `Inventory`.
+- `black --check` in the `dev` extra and in CI.
+- **RESP writer**, `io.resp.write_resp(inventory)`: the responses of an obspy
+  `Inventory` as RESP text, every channel one after the other, which obspy cannot
+  write. Every stage type: poles and zeros (B053), coefficients (B054), response
+  list (B055), FIR (B061) and polynomial (B062), each with its decimation (B057)
+  and gain (B058), then the sensitivity (stage 0, B058) or the polynomial of the
+  channel. The numbers keep 16 significant digits, so a float is written and read
+  back exactly (the NRL service writes 6). Tested against three NRL
+  configurations saved in `tests/data` (STS-2 + Q330HR, Tellus + Centaur, a
+  polynomial sensor): read back by obspy, the curves equal those of the
+  StationXML.
 - Matching of the keys in `core.matching`, the base of the coming `nrlx response`:
   `split_condition` reads a condition on a parameter (`FR=40`, `corner>=60`, the
   range `FR=100..500`), `compare` compares a parameter value with it, as numbers
@@ -52,6 +90,18 @@ changes as listed below.
   `--base-url`, and `Nrlx` holds it in `prefixes` (`Nrlx.from_cache` reads it,
   `Nrlx.sync` downloads it). A cache synced before this version has no table:
   run `nrlx sync` once.
+- **`Catalog.find(keys, prefixes, element_name)`** returns a `Found`: the
+  matching rows, the parameters that still vary between them (`varying`), notes on
+  the words found only at the start of a name or inside a text, and hints when
+  nothing matches (the key that leaves no row, the nearest names, the values of a
+  parameter there). The words keep the rows with the lowest total tier, so their
+  order does not matter; a condition names its parameter by code or by the start
+  of a word of its name, among the parameters the other keys leave (`corner`
+  alone may be Long-Period_Corner or High-Frequency_Corner). `Catalog.resolve`
+  takes the keys and the code table and is built on it; its error lists what
+  still varies. `get_configurations` keeps only the element filter: the
+  manufacturer, model, instconfig and keys filters are keys of `find`;
+  `contains_keys` is removed.
 - mypy checks with `python_version = "3.12"`, as the numpy stubs need: with 3.11
   `mypy --strict` stopped on them before checking nrlx.
 - **obspy and msgspec are required**, and Python 3.11 or later: the `nrlx[obspy]`
@@ -61,6 +111,11 @@ changes as listed below.
   `FileNotFoundError`, an invalid catalog or request a `ValueError`, a selection
   matching no configuration or several a `LookupError`, a service error an
   `httpx.HTTPError`, a file error an `OSError`.
+- **Removed, replaced by `Nrlx.response`**: `Nrlx.combine`, `BuiltResponse`,
+  `BuildInput`/`Build`, `InstrumentInput`/`Instrument` and
+  `io.inventory.merge_stationxml`. `combine_params` asks only the StationXML
+  response, without the labels, and `cascade_instconfig` takes the list of the
+  instconfigs of the parts. `from nrlx import Nrlx, Catalog, Found, write_resp`.
 - Modules moved: `nrlx.nrl.Nrlx` to `nrlx.models.nrlx`, `BuiltResponse` to
   `nrlx.models.response`, `Catalog` to `nrlx.models.catalog`, the HTTP client to
   `nrlx.io.service` (functions `get_url` and `get` instead of `NRLClient`), the
@@ -82,19 +137,17 @@ changes as listed below.
   `timeout` instead of an `NRLClient`.
 - The doctor checks are functions, `check_response(content, format)` returning
   `(severity, message)` pairs, instead of `HealthReport.from_file`.
-- `nrlx build` rejects `--sensor-instconfig` together with
-  `--sensor-manufacturer`/`--sensor-model`/`--sensor-keys` (the filters were
-  ignored), and the same for the datalogger.
+- **Removed, replaced by `nrlx response`**: `nrlx browse` (summary, elements,
+  manufacturers, models, configs, show) and `nrlx build`, with its
+  `--sensor-instconfig`/`--sensor-keys` style flags, `--merge-channels` (one file
+  with every channel is now the default, `--split` the other way) and `--zip`.
 - The errors are printed on stderr.
 
 ### Fixed
 
 - `nrlx sync` and `Nrlx.sync` validate the download before writing it: an error
   page or a broken catalog no longer replaces the previous catalog in the cache.
-- The merged StationXML of `nrlx build --merge-channels` records the instconfig of
-  the sensor and datalogger, not only the sensor one.
-- Repeated channels in `nrlx build` are rejected, instead of writing the same file
-  twice.
+- Repeated channels are rejected, instead of writing the same file twice.
 - File paths and catalog texts with square brackets are no longer read as Rich
   markup in the output.
 

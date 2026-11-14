@@ -21,5 +21,5 @@ def test_no_arguments_prints_the_help():
     result = runner.invoke(app, [])
 
     assert "Usage" in result.output
-    for command in ["status", "sync", "prefixes", "browse", "build", "doctor"]:
+    for command in ["status", "sync", "prefixes", "response", "doctor"]:
         assert command in result.output

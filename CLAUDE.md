@@ -25,17 +25,17 @@ building seismic instrument responses with its web service. Published on PyPI.
 
 Each layer imports only the ones below it.
 
-- `src/nrlx/schema/`: msgspec structs of every input (`...Input` classes). `catalog`, `prefixes` and `cache` mirror the NRL service JSON; `instrument` and `build` are the requests, with their validation. `response` holds the `ResponseFormat` literal.
-- `src/nrlx/models/`: models subclassing the input structs with the methods (`Catalog.get_configurations`, `Catalog.resolve`, `Instrument.get_instconfig`, `Build.build`), plus the library entry points `Nrlx` (catalog and service) and `BuiltResponse` (a response with its obspy conversions).
-- `src/nrlx/core/`: pure functions taking their arguments one by one, independent of the structs: matching (`contains`, `contains_keys`), `/combine` parameters, doctor checks.
-- `src/nrlx/io/`: the NRL service (`get`, `get_url`), the local cache (paths, `read_catalog`, `decode_catalog`, `write_catalog`, and the same for the code table: `read_prefixes`, `decode_prefixes`, `write_prefixes`), obspy reading, merging and placing (coordinates) of StationXML.
-- `src/nrlx/tools/cmd/`: the typer commands. `__init__.py` builds the `nrlx` app (entry point `nrlx.tools.cmd:app`) from the modules `catalog` (status, sync, prefixes), `browse`, `build` and `doctor`.
+- `src/nrlx/schema/`: msgspec structs of every input (`...Input` classes). `catalog`, `prefixes` and `cache` mirror the NRL service JSON; `response` holds the request `ResponseInput`, with its validation, and the `ResponseFormat` literal.
+- `src/nrlx/models/`: models subclassing the input structs with the methods (`Catalog.get_configurations`, `Catalog.find` returning `Found`, `Catalog.resolve`), plus the library entry point `Nrlx` (catalog, code table and service: `find`, `response` returning an obspy `Inventory`).
+- `src/nrlx/core/`: pure functions taking their arguments one by one, independent of the structs: matching of the keys (`split_condition`, `compare`, `word_tier`, `resolve_parameter`, `sort_values`, `varying_values`) and of the names (`contains`), SEED band codes (`band_codes`), `/combine` parameters, doctor checks.
+- `src/nrlx/io/`: the NRL service (`get`, `get_url`), the local cache (paths, `read_catalog`, `decode_catalog`, `write_catalog`, and the same for the code table: `read_prefixes`, `decode_prefixes`, `write_prefixes`), obspy reading, labelling (`label_channels`) and placing (`set_coordinates`) of StationXML, and the RESP writer (`write_resp`).
+- `src/nrlx/tools/cmd/`: the typer commands. `__init__.py` builds the `nrlx` app (entry point `nrlx.tools.cmd:app`) from the modules `catalog` (status, sync, prefixes), `response` and `doctor`.
 
 ## Schema conventions
 
 - The structs mirroring the NRL service JSON are frozen and accept unknown fields, so that a field added by the service does not break the decoding. Their lists are named in the plural, with `msgspec.field(name=...)` for the JSON key.
 - The request structs are frozen, `kw_only=True` and `forbid_unknown_fields=True`.
-- Nested fields that need methods use the model class (for example `BuildInput.sensor: Instrument`, `CatalogFileInput.catalog: Catalog`), as in isamgeo-seismic-tools.
+- Nested fields that need methods use the model class (for example `CatalogFileInput.catalog: Catalog`), as in isamgeo-seismic-tools.
 - Defaults live in the schema. Validation in `__post_init__` raising `ValueError`, only when the structure cannot express the rule.
 - Selections resolve to exactly one configuration before any request to the service.
 
@@ -47,6 +47,6 @@ Each layer imports only the ones below it.
 
 ## Tests and tooling
 
-- Install with `pip install -e '.[dev]'`, then `ruff check src tests`, `ruff format --check src tests`, `mypy src`, `pytest`.
+- Install with `pip install -e '.[dev]'`, then `ruff check src tests`, `ruff format --check src tests`, `black --check src tests`, `mypy src`, `pytest`.
 - `tests/lib/` tests the library, `tests/entrypoints/` the commands (typer `CliRunner`), with the shared data in `tests/data/`. `tests/conftest.py` has the fixtures, including `fake_service`, which replaces `httpx.get` and records the requests. Tests never hit the network.
 - Record every change in `CHANGELOG.md` under `[Unreleased]`, without a version number until the user sets it.

@@ -30,6 +30,9 @@ jobs:
       - name: Format
         run: ruff format --check src tests
 
+      - name: Black
+        run: black --check src tests
+
       - name: Mypy
         run: mypy src
 

@@ -11,34 +11,31 @@ Response Library (NRL v2) and building seismic instrument responses.
 ## Quickstart
 
 How it works, in short: `nrlx` keeps one local copy of IRIS's NRL catalog on your
-disk, you describe your instrument, and `nrlx` asks IRIS to build the actual
-response file. Three commands:
+disk, you describe your instrument with a few keys, and `nrlx` asks IRIS to build
+the actual response. One command finds and writes:
 
 ```bash
 pip install nrlx
 
-nrlx sync                                 # download the catalog (first run and refreshes); always healthy to refresh the catalog!
+nrlx sync                                   # download the catalog and its code table (first run and refreshes)
 
-nrlx build --sensor-keys streckeisen,STS-2,EG3,SG1500 \
-  --output station.xml                    # a real StationXML/inv file
+nrlx response --sensor luni,tellus          # what matches, and what still varies
+nrlx response --sensor luni,tellus,LP=1 \
+  --datalogger centaur,FR=100,FV=40Vpp,DF=Off,FP=Linear \
+  --network XY --station TST --location 00 --channels HHZ,HHN,HHE \
+  -o station.xml                            # a real StationXML file
 
-nrlx doctor station.xml                   # sanity-check what you built
+nrlx doctor station.xml                     # sanity-check what you wrote
 ```
 
-Each comma-separated key in `--sensor-keys` is a word that must match somewhere
-in the sensor's catalog entry. Too few keys? `build` lists every matching
-configuration so you can add one more. Don't know the instrument names yet?
-Explore first:
+Without `-o`, `nrlx response` only shows: the matches of each part and the
+parameters that still vary between them. Add keys until each part matches one
+configuration, then add `-o FILE`. Not sure where to start? `nrlx response -i`
+asks the parts step by step, writes the file and prints the same command line.
 
-```bash
-nrlx browse manufacturers streckeisen              # find a manufacturer by name
-nrlx browse models --manufacturer streckeisen      # its models
-nrlx browse configs streckeisen --element sensor   # exact configs + instconfigs
-```
-
-That `station.xml` is a real FDSN StationXML file straight from IRIS's own service - load it anywhere that reads StationXML, including `obspy.read_inventory("station.xml")`.
-
-Full command reference and the ifs-and-buts (dataloggers, multiple channels, output formats) are below; a fuller walkthrough is planned for the project wiki.
+That `station.xml` is a real FDSN StationXML file built by IRIS's own service:
+load it anywhere that reads StationXML, including
+`obspy.read_inventory("station.xml")`.
 
 ## Install
 
@@ -47,203 +44,126 @@ pip install nrlx
 ```
 
 nrlx needs Python 3.11 or later, and installs `obspy` with it: the responses it
-builds convert to obspy objects in memory (see [Python library](#python-library)).
+builds are obspy objects in memory (see [Python library](#python-library)).
 
 ## Concepts
 
-Three terms cover everything nrlx does:
-
-- **Catalog** -> IRIS's tree of every nominal response, organized as
-  `element` (sensor / datalogger) → `manufacturer` → `model` → `configuration`.
-- **instconfig** -> the exact identifier of one configuration, e.g.
-  `sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel`. It is what `build`
-  actually sends to IRIS. `browse` exists to help you find the right one.
-- **Local cache** -> nrlx keeps one copy of the catalog and of its code table on
-  disk (under your platform cache dir) so browsing is instant and offline. `sync`
-  refreshes both.
+- **Catalog**: IRIS's tree of every nominal response, organized as `element`
+  (sensor, datalogger, integrated, soh) → `manufacturer` → `model` →
+  `configuration`.
+- **instconfig**: the exact identifier of one configuration, e.g.
+  `sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel`. Its parts after the
+  model are two-letter codes and values (`SG1500` is a sensitivity of 1500 V/m/s);
+  `nrlx prefixes` decodes them. It is what nrlx sends to IRIS; the keys exist to
+  find it.
+- **Local cache**: nrlx keeps one copy of the catalog and of its code table on
+  disk (under your platform cache dir), so finding is instant and offline. `nrlx
+  sync` refreshes both.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| `nrlx status [--live]` | Show version and local cache info; `--live` also checks connectivity. |
+| `nrlx status [--live]` | Show version and local cache info; `--live` also checks the service. |
 | `nrlx sync` | Download the current NRL catalog and code table into the local cache. |
-| `nrlx browse <summary\|elements\|manufacturers\|models\|configs\|show>` | Browse the cached catalog; `show <instconfig>` prints one config's full parameters. |
-| `nrlx prefixes [query]` | Decode the two-letter parameter codes used in instconfigs (LP, FR, FV, ...). |
-| `nrlx build` | Build a sensor(+datalogger) response and save it to a file. |
+| `nrlx prefixes [query]` | Decode the two-letter parameter codes of the instconfigs (LP, FR, FV, ...). |
+| `nrlx response` | Find configurations by keys, and write their response (StationXML or RESP). |
 | `nrlx doctor <file>` | Run structural health checks on a saved response file. |
 
-Run `nrlx <command> --help` for the full option list on any of these — each
-`browse` subcommand only exposes the filters that actually apply to it.
+Run `nrlx <command> --help` for the full option list.
 
-`browse manufacturers`/`models` take an optional positional query that matches
-*that level's own name* (a manufacturer name, a model name) - `--element`/
-`--manufacturer` remain as flags to narrow by a parent level. `browse configs`
-is the exception: its positional query matches manufacturer, model, *and*
-instconfig at once, since a config doesn't have a single "own name." So
-`browse models streckeisen` looks for a model literally named "streckeisen"
-(nothing) - use `browse models --manufacturer streckeisen` instead - while
-`browse configs streckeisen` works directly, because configs search all three
-fields - plus each config's description and parameter names/values, so
-`browse configs groundVel` or `browse configs "400 V/m/s"` find configs by their
-physical parameters, not just their names.
+### Finding: keys
 
-The list views stay deliberately narrow. To see everything one configuration
-carries - description and every parameter (Sensitivity, Sensor_Type, corner
-period, ...) - use `browse show`:
+`nrlx response` without arguments shows the catalog: each manufacturer of each
+element with its counts. Bare keys (`nrlx response sts-2`, `--element sensor` to
+narrow) explore every element; the parts `--sensor`, `--datalogger`,
+`--integrated` and `--soh` are what `-o` writes. A sensor, a datalogger or both;
+an integrated instrument or a state of health channel alone.
 
-```bash
-nrlx browse show sensor_Lunitek_TELLUS_LP1_SG400_STgroundVel
-```
+The keys of a part are comma-separated or repeated, in any order. Each is:
 
-Those parameter values are exactly what you can pass as build keys (next section).
+- a **word**: a manufacturer (`luni`), a model, a part of the instconfig (`LP1`,
+  `Q330HR_PG1`), a parameter value (`'400 V/m/s'`), or the exact instconfig. A
+  whole name or part wins over the start of one, which wins over a text found
+  inside: `LP1` keeps the LP1 configuration, not LP10 and LP120. A note says when
+  a word matched only the start of a name or inside a text;
+- a **condition** `name<op>value` with `=`, `<`, `>`, `<=`, `>=`, or a range
+  `FR=100..500`, `FR=100..`, `FR=..200` (shell-safe, no quotes). The name is a
+  code (`FR`, `LP`) or the start of a word of a parameter name (`corner>=60`);
+  numbers are compared as numbers, so `FR=40` is 40 Hz, not 400 Hz.
 
-If a sensor/datalogger filter in `nrlx build` matches more than one configuration,
-it lists every matching `instconfig` string so you can pin down the exact one with
-`--sensor-instconfig`/`--datalogger-instconfig` instead.
+What you see depends on how many configurations match: more than 20 are grouped
+by model, with the parameters that still vary in each; up to 20 are listed one
+per row; one is shown in full, with every parameter. When nothing matches, nrlx
+says which key leaves no configuration, and suggests the nearest names or the
+values there.
 
-### Selecting by keys instead of instconfig
-
-Instead of hunting down the exact instconfig, describe the instrument with
-comma-separated `--sensor-keys`/`--datalogger-keys` (ObsPy-v1 style). Every key
-must match somewhere in a configuration - manufacturer, model, instconfig,
-description, or a parameter name or value like `Sensitivity`, `40Vpp`, or
-`groundVel` (quote keys with spaces: `--sensor-keys 'STS-2,100 Hz'`). Use
-`nrlx browse show <instconfig>` to see the full parameter list you can key on.
-If the selection is ambiguous, nrlx lists the matching instconfigs; pick distinguishing fragments from that list as your next keys:
+### Writing: channels, format, labels
 
 ```bash
-nrlx build \
-  --sensor-keys streckeisen,STS-2,EG3,SG1500 \
-  --datalogger-keys Q330HR_PG1,FR40,ADHR,LRbelow100 \
-  --output station.xml
+nrlx response --sensor streckeisen,STS-2,EG3,SG=1500 \
+  --datalogger Q330HR_PG1,FR=40,ADHR,LRbelow100 \
+  --network XY --station MYSTN --location 00 --channels BHZ,BHN,BHE \
+  --starttime 2021-01-01 \
+  --latitude 49.096 --longitude 8.432 --elevation 112 \
+  -o station.xml
 ```
 
-The singular repeated form also works (`--sensor-key streckeisen --sensor-key
-STS-2 ...`), and both spellings accept either style.
-
-Candidate instconfigs are full of coded fragments like `LP120`, `FR500`, or
-`FV10Vpp`. Run `nrlx prefixes` (or `nrlx prefixes corner` to filter) to decode
-them — it reads the official code table of the NRL service that `nrlx sync`
-saves, offline, e.g.
-LP = Long-Period Corner, FR = Final Sample Rate, FV = Full-Scale Voltage.
-
-### Multiple channels
-
-`--channels` takes comma-separated channel codes. Several channels write one
-file per channel (`station_EHZ.xml`, `station_EHN.xml`, ...); add `--merge-channels` to
-get one StationXML inventory containing all of them:
-
-```bash
-nrlx build \
-  --sensor-keys streckeisen,STS-2,EG3,SG1500 \
-  --network XY --station MYSTN \
-  --channels EHZ,EHN,EHE --merge-channels --output station.xml
-```
-
-### Coordinates
-
-The service leaves placeholders for the place of the station. `--latitude` and
-`--longitude` (degrees) write the real place on the station and on every
-channel; `--elevation` (metres) and `--depth` (metres below the surface, for a
-borehole sensor) are 0 unless given. They need the StationXML format, not zipped:
-
-```bash
-nrlx build \
-  --sensor-keys streckeisen,STS-2,EG3,SG1500 \
-  --network XY --station MYSTN \
-  --channels EHZ,EHN,EHE --merge-channels \
-  --latitude 49.096 --longitude 8.432 --elevation 112 --output station.xml
-```
+- The format comes from the extension: `.xml` for StationXML, `.resp` for RESP;
+  `--format stationxml|resp` overrides it. The RESP writer keeps 16 significant
+  digits.
+- `--channels` are written as given, all in one file; `--split` writes one file
+  per channel, named by its SEED id (`station_XY.MYSTN.00.BHZ.xml`). A channel
+  code whose band letter does not fit the sample rate (SEED norm) gets a one-line
+  note, never an error.
+- The service builds the response once; nrlx copies it for each channel and sets
+  the network, station, location, times (`--starttime`, `--endtime`, UTC) and the
+  place (`--latitude`, `--longitude` in degrees; `--elevation` and `--depth` in
+  metres, 0 unless given). The labels not given keep the service placeholders.
 
 ## Python library
 
 Everything the CLI does is a thin layer over the `nrlx` package:
 
 ```python
-from nrlx import Nrlx
+from nrlx import Nrlx, write_resp
 
-nrl = Nrlx.from_cache()                      # loads the catalog already on disk
-# nrl = Nrlx.sync()                          # or download a fresh one first
-#                                            # (first run / to refresh)
+nrl = Nrlx.from_cache()                      # the catalog and code table on disk
+# nrl = Nrlx.sync()                          # or download fresh ones first
 
-# Find and browse: each row carries its parents
-for element, manufacturer, model, configuration in nrl.catalog.get_configurations(
-    "sensor", "Streckeisen", keys=["groundVel"]
-):
+# Find: the rows carry their parents, with what still varies
+found = nrl.find(["luni", "tellus"], "sensor")
+for element, manufacturer, model, configuration in found.rows:
     print(model.name, configuration.instconfig, configuration.parameters)
+print(found.varying)                         # {"Long-Period_Corner": ["1 s", ...], ...}
 
-nrl.catalog.get_configurations(keys=["lunitek"])   # free-text across the catalog
-nrl.catalog.resolve("sensor", keys=["STS-2", "SG1500", "EG3"])  # exactly one, or LookupError
-
-# Combine sensor + datalogger, entirely in memory (nothing written to disk)
-built = nrl.combine(
-    sensor_keys=["streckeisen", "STS-2", "EG3", "SG1500"],
-    datalogger_keys=["Q330HR_PG1", "FR40", "ADHR", "LRbelow100"],
+# Build: each part resolves to one configuration, then one request
+inventory = nrl.response(
+    sensor=["luni", "tellus", "LP=1"],
+    datalogger=["centaur", "FR=100", "FV=40Vpp", "DF=Off", "FP=Linear"],
+    network="XY", station="TST", location="00", channels=["HHZ", "HHN", "HHE"],
+    latitude=45.6, longitude=8.9,
 )
 
-built.content          # raw StationXML bytes
-built.save("out.xml")  # write a file only when you want one
+inventory.write("station.xml", format="STATIONXML")   # an obspy Inventory
+text = write_resp(inventory)                          # RESP, which obspy cannot write
 ```
 
-Each element can be selected by keys (resolved through the catalog) *or* by an
-exact instconfig string - and you can mix the two. The datalogger is optional;
-omit it for a sensor-only response.
-
-```python
-built = nrl.combine(
-    sensor_instconfig="sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel",
-    datalogger_keys=["Q330HR_PG1", "FR40"],   # or datalogger_instconfig="..."
-)
-```
-
-Passing both `sensor_keys` and `sensor_instconfig` for the same element is an
-error (same for the datalogger) - give exactly one. nrlx raises built-in
-exceptions: `LookupError` when keys match no configuration or several (the
-message lists the candidates), `ValueError` for an invalid request or catalog,
-`FileNotFoundError` when the catalog has not been synced, and `httpx.HTTPError`
-when the service cannot be reached.
-
-`combine()` also takes the StationXML identity and validity fields — pass them
-and IRIS stamps them into the response instead of placeholders:
-
-```python
-built = nrl.combine(
-    sensor_keys=["streckeisen", "STS-2", "EG3", "SG1500"],
-    network="XY", station="MYSTN", location="00", channel="HHZ",
-    starttime="2021-01-01", endtime="2025-01-01",
-)
-```
-
-All six are optional; omit them and the service fills in placeholders. If you'd
-rather not commit to StationXML naming at all, skip them and take the bare
-`Response` instead (below).
-
-A StationXML `BuiltResponse` converts to obspy in memory —
-this is the NRL-v1-style workflow, and the way around StationXML's strict
-network/station/channel naming: take the bare `Response` and attach it to
-channels you build yourself, with whatever codes you need.
-
-```python
-inv  = built.to_inventory()   # obspy Inventory
-resp = built.to_response()    # bare obspy Response - no naming attached
-paz  = built.to_paz()         # poles & zeros stage
-
-from obspy.core.inventory import Channel
-channel = Channel(code="HHZ", location_code="00",
-                  latitude=..., longitude=..., elevation=..., depth=...,
-                  response=resp)             # your naming, your inventory
-```
+nrlx raises built-in exceptions: `LookupError` when a part matches no
+configuration or several (the message lists the hints or what still varies),
+`ValueError` for an invalid request or catalog, `FileNotFoundError` when the
+cache has not been synced, and `httpx.HTTPError` when the service cannot be
+reached. Each part resolves before any request, so a wrong selection fails
+offline.
 
 ## Status
 
 Working end to end against the live NRL v2 service (released 0.2.x on PyPI; 0.1.0
-was an early skeleton, yanked): catalog browsing, key/instconfig selection,
-sensor+datalogger combination, multi-channel builds with optional merging,
-in-memory obspy conversion, and the structural `doctor` check. Planned next:
-response format merging and conversion (dataless SEED, RESP, SAC PZ), a suggestion
-engine, a TUI, a web interface, and local sensor-asset management. See
-[CHANGELOG.md](CHANGELOG.md) for details.
+was an early skeleton, yanked): finding by keys and conditions, sensor and
+datalogger combination, StationXML and RESP writing with any channel codes, and
+the structural `doctor` check. Planned next: a local copy of the NRL repository,
+format conversion, deeper doctor checks, local sensor assets, and combining any
+sensor and datalogger responses. See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Note for developers
 
@@ -253,10 +173,10 @@ importing only the ones below it:
 
 | Layer | Holds |
 | --- | --- |
-| `nrlx/schema/` | msgspec structs of every input: the NRL service JSON (`catalog`, `prefixes`), the cache files, and the requests (`instrument`, `build`), with their validation |
-| `nrlx/models/` | the structs with their methods (`Catalog`, `Instrument`, `Build`), plus `Nrlx` and `BuiltResponse` |
-| `nrlx/core/` | pure functions on plain values: matching, `/combine` parameters, doctor checks |
-| `nrlx/io/` | the NRL service (httpx), the local cache, obspy reading and merging |
+| `nrlx/schema/` | msgspec structs of every input: the NRL service JSON (`catalog`, `prefixes`), the cache files, and the request `response`, with its validation |
+| `nrlx/models/` | the structs with their methods (`Catalog`, `Found`), plus `Nrlx` |
+| `nrlx/core/` | pure functions on plain values: matching, SEED band codes, `/combine` parameters, doctor checks |
+| `nrlx/io/` | the NRL service (httpx), the local cache, obspy reading and labelling, the RESP writer |
 | `nrlx/tools/cmd/` | the `nrlx` commands, the only code that prints and exits |
 
 Library code raises built-in exceptions, and each command catches the ones it

@@ -10,6 +10,7 @@ from nrlx.core.matching import (
     compare,
     split_condition,
     to_number,
+    varying_values,
     word_tier,
 )
 
@@ -106,3 +107,16 @@ def test_word_tier(word: str, instconfig: str, names: list[str], tier: int) -> N
     texts = [*names, instconfig]
 
     assert word_tier(word, instconfig, names, texts) == tier
+
+
+def test_varying_values_keeps_the_parameters_with_several_values() -> None:
+    parameters = [
+        {"Sensitivity": "1500 V/m/s", "Long-Period_Corner": "120 s"},
+        {"Sensitivity": "750 V/m/s", "Long-Period_Corner": "120 s"},
+        {"Sensitivity": "20000 V/m/s"},
+    ]
+
+    assert varying_values(parameters) == {
+        "Sensitivity": ["750 V/m/s", "1500 V/m/s", "20000 V/m/s"]
+    }
+    assert varying_values([]) == {}

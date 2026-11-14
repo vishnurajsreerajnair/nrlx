@@ -2,7 +2,22 @@
 
 from __future__ import annotations
 
-from nrlx.core.matching import contains, contains_keys
+import difflib
+
+import msgspec
+
+from nrlx.core.matching import (
+    ANYWHERE,
+    NOT_FOUND,
+    START,
+    compare,
+    contains,
+    resolve_parameter,
+    sort_values,
+    split_condition,
+    varying_values,
+    word_tier,
+)
 from nrlx.schema.catalog import (
     CatalogInput,
     ConfigurationInput,
@@ -10,9 +25,36 @@ from nrlx.schema.catalog import (
     ManufacturerInput,
     ModelInput,
 )
+from nrlx.schema.prefixes import PrefixInput
 
 # candidates listed by an ambiguous selection
 MAX_CANDIDATES_SHOWN = 20
+
+# names suggested for a word that matches nothing, and how close they must be
+MAX_SUGGESTIONS = 3
+SUGGESTION_CUTOFF = 0.6
+
+
+class Found(msgspec.Struct, frozen=True):
+    """Configurations matched by keys, with what helps to narrow them
+
+    Args:
+        rows: element, manufacturer, model and configuration of each match, in
+            catalog order.
+        varying: values of each parameter that differs between the rows, sorted,
+            by parameter name.
+        notes: how the words not found whole were found, for example "luni: start
+            of Lunitek".
+        hints: why nothing matches, only without rows, for example "lunitec: no
+            match. Did you mean Lunitek?".
+
+
+    """
+
+    rows: list[tuple[ElementInput, ManufacturerInput, ModelInput, ConfigurationInput]]
+    varying: dict[str, list[str]]
+    notes: list[str]
+    hints: list[str]
 
 
 class Catalog(CatalogInput, frozen=True):
@@ -100,106 +142,322 @@ class Catalog(CatalogInput, frozen=True):
     def get_configurations(
         self,
         element_name: str | None = None,
-        manufacturer_name: str | None = None,
-        model_name: str | None = None,
-        instconfig: str | None = None,
-        keys: list[str] | None = None,
     ) -> list[tuple[ElementInput, ManufacturerInput, ModelInput, ConfigurationInput]]:
         """Configurations of the catalog, with their element, manufacturer and model
 
-        Each filter narrows its own field, and the keys search every field: each key
-        must be found in the manufacturer, the model, the instconfig, the description,
-        or a parameter name or value. For example the key groundVel finds the
-        configurations by a parameter value, Sensitivity by a parameter name.
-
         Args:
             element_name: text in the element name, None for any element.
-            manufacturer_name: text in the manufacturer name, None for any
-                manufacturer.
-            model_name: text in the model name, None for any model.
-            instconfig: text in the instconfig, None for any instconfig.
-            keys: texts found in the configuration, all of them. None for no keys.
 
         Returns:
-            element, manufacturer, model and configuration of each matching
-            configuration.
+            element, manufacturer, model and configuration of each configuration.
 
 
         """
         configurations = [
             (element, manufacturer, model, configuration)
-            for element, manufacturer, model in self.get_models(
-                element_name, manufacturer_name, model_name
-            )
+            for element, manufacturer, model in self.get_models(element_name)
             for configuration in model.configurations
-            if contains(configuration.instconfig, instconfig)
-            and contains_keys(
-                [
-                    manufacturer.name,
-                    model.name,
-                    configuration.instconfig,
-                    configuration.description,
-                    *configuration.parameters.keys(),
-                    *configuration.parameters.values(),
-                ],
-                keys or [],
-            )
         ]
 
         return configurations
 
+    def find(
+        self,
+        keys: list[str],
+        prefixes: list[PrefixInput],
+        element_name: str | None = None,
+    ) -> Found:
+        """Configurations matched by keys: words and conditions on the parameters
+
+        A word (luni, LP1, Q330HR_PG1) is found whole, at the start of a name or
+        part, or anywhere; the rows kept have the lowest total tier of the words. A
+        condition (FR=40, corner>=60, FR=100..500) holds on a parameter, named by
+        its code or by the start of a word of its name. See core.matching.
+
+        Args:
+            keys: words and conditions, all of them, in any order.
+            prefixes: code table, for the condition names that are codes.
+            element_name: element searched, for example sensor; None for every
+                element.
+
+        Returns:
+            the matched rows, the parameters that still vary, the notes on the
+            words not found whole, and the hints when nothing matches.
+
+        Raises:
+            ValueError: if a condition name stands for several parameters, or a
+                range has no bound.
+
+
+        """
+        rows = self.get_configurations(element_name)
+        codes = [(prefix.prefix, prefix.description) for prefix in prefixes]
+        words = [key for key in keys if not split_condition(key)]
+        matched = self.match_rows(rows, keys, codes)
+
+        # the parameters that still differ between the rows
+        varying = varying_values(
+            [configuration.parameters for *_, configuration in matched]
+        )
+
+        # the words found only at the start of a name or part, or inside a text
+        notes: list[str] = list()
+        for word in words:
+            match sorted({self.row_tier(word, row) for row in matched}):
+                case [tier] if tier == START:
+                    starts = sorted(
+                        {
+                            text
+                            for _, manufacturer, model, configuration in matched
+                            for text in [
+                                manufacturer.name,
+                                model.name,
+                                *configuration.instconfig.split("_"),
+                            ]
+                            if text.lower().startswith(word.lower())
+                        }
+                    )
+                    shown = ", ".join(starts[:MAX_SUGGESTIONS])
+                    notes.append(f"{word}: start of {shown}")
+                case [tier] if tier == ANYWHERE:
+                    notes.append(f"{word}: found inside a text only")
+                case _:
+                    pass
+
+        # without rows, the keys that leave none
+        hints: list[str] = list()
+        if not matched:
+            vocabulary = sorted(
+                {
+                    text
+                    for _, manufacturer, model, configuration in rows
+                    for text in [
+                        manufacturer.name,
+                        model.name,
+                        *configuration.instconfig.split("_"),
+                    ]
+                }
+            )
+            for key in keys:
+                # without the key a condition name can stand for several
+                # parameters: the key gets no hint from the other keys
+                otherkeys = [other for other in keys if other != key]
+                try:
+                    others = self.match_rows(rows, otherkeys, codes)
+                except ValueError:
+                    others = []
+                isword = key in words
+                if isword and not self.match_rows(rows, [key], codes):
+                    close = difflib.get_close_matches(
+                        key, vocabulary, MAX_SUGGESTIONS, SUGGESTION_CUTOFF
+                    )
+                    suggestion = f" Did you mean {', '.join(close)}?" if close else ""
+                    hints.append(f"{key}: no match.{suggestion}")
+                elif isword and others:
+                    hints.append(f"{key}: no match with the other keys.")
+                elif others:
+                    hints.append(self.condition_hint(key, others, codes))
+            if not hints:
+                hints.append("No configuration matches all the keys together.")
+
+        found = Found(rows=matched, varying=varying, notes=notes, hints=hints)
+
+        return found
+
+    def match_rows(
+        self,
+        rows: list[
+            tuple[ElementInput, ManufacturerInput, ModelInput, ConfigurationInput]
+        ],
+        keys: list[str],
+        codes: list[tuple[str, str]],
+    ) -> list[tuple[ElementInput, ManufacturerInput, ModelInput, ConfigurationInput]]:
+        """Rows matched by every key, the best by the lowest total tier of the words
+
+        Args:
+            rows: rows searched.
+            keys: words and conditions, all of them.
+            codes: code and parameter name of each code of the table.
+
+        Returns:
+            the matched rows, in their order.
+
+        Raises:
+            ValueError: if a condition name stands for several parameters, or a
+                range has no bound.
+
+
+        """
+        words = [key for key in keys if not split_condition(key)]
+        conditions = [condition for key in keys for condition in split_condition(key)]
+
+        # every word somewhere, with its tier in each row
+        tiered = [(row, [self.row_tier(word, row) for word in words]) for row in rows]
+        tiered = [(row, tiers) for row, tiers in tiered if NOT_FOUND not in tiers]
+
+        # the conditions, on the parameters of the rows of the words
+        configurations = [configuration for (*_, configuration), _ in tiered]
+        names = sorted(
+            {
+                name
+                for configuration in configurations
+                for name in configuration.parameters
+            }
+        )
+        for name, operator, value in conditions:
+            match resolve_parameter(name, codes, names):
+                case [parameter]:
+                    kept = list()
+                    for row, tiers in tiered:
+                        *_, configuration = row
+                        present = configuration.parameters.get(parameter)
+                        if present is not None and compare(present, operator, value):
+                            kept.append((row, tiers))
+                    tiered = kept
+                case []:
+                    tiered = []
+                case parameters:
+                    raise ValueError(
+                        f"{name!r} stands for several parameters: "
+                        f"{', '.join(parameters)}. Use one of them, or its code."
+                    )
+
+        # the lowest total tier of the words
+        best = min([sum(tiers) for _, tiers in tiered], default=0)
+        matched = [row for row, tiers in tiered if sum(tiers) == best]
+
+        return matched
+
+    def row_tier(
+        self,
+        word: str,
+        row: tuple[ElementInput, ManufacturerInput, ModelInput, ConfigurationInput],
+    ) -> int:
+        """Tier of a word in a row, see core.matching.word_tier
+
+        The whole names are the manufacturer, the model and the parameter values;
+        the description and the parameter names are searched anywhere only.
+
+        Args:
+            word: key without an operator.
+            row: element, manufacturer, model and configuration.
+
+        Returns:
+            WHOLE, START, ANYWHERE or NOT_FOUND.
+
+
+        """
+        _, manufacturer, model, configuration = row
+        names = [manufacturer.name, model.name, *configuration.parameters.values()]
+        texts = [
+            *names,
+            configuration.instconfig,
+            configuration.description,
+            *configuration.parameters.keys(),
+        ]
+        tier = word_tier(word, configuration.instconfig, names, texts)
+
+        return tier
+
+    def condition_hint(
+        self,
+        key: str,
+        rows: list[
+            tuple[ElementInput, ManufacturerInput, ModelInput, ConfigurationInput]
+        ],
+        codes: list[tuple[str, str]],
+    ) -> str:
+        """Why a condition matches none of the rows of the other keys
+
+        Args:
+            key: condition, for example FR=45.
+            rows: rows matched by the other keys.
+            codes: code and parameter name of each code of the table.
+
+        Returns:
+            the values of its parameter in the rows, or the parameters of the rows
+            when its name stands for none of them.
+
+
+        """
+        [(name, _, _), *_] = split_condition(key)
+        names = sorted(
+            {
+                parameter
+                for *_, configuration in rows
+                for parameter in configuration.parameters
+            }
+        )
+        match resolve_parameter(name, codes, names):
+            case [parameter, *_]:
+                present = sort_values(
+                    [
+                        configuration.parameters[parameter]
+                        for *_, configuration in rows
+                        if parameter in configuration.parameters
+                    ]
+                )
+                hint = (
+                    f"{key}: no match with the other keys. "
+                    f"Values there: {', '.join(present)}"
+                )
+            case _:
+                listed = ", ".join(names) or "none"
+                hint = (
+                    f"{key}: no parameter {name!r} with the other keys. "
+                    f"Parameters there: {listed}"
+                )
+
+        return hint
+
     def resolve(
         self,
         element_name: str,
-        manufacturer_name: str | None = None,
-        model_name: str | None = None,
-        instconfig: str | None = None,
-        keys: list[str] | None = None,
+        keys: list[str],
+        prefixes: list[PrefixInput],
     ) -> ConfigurationInput:
-        """The single configuration matched by the filters, see get_configurations
+        """The single configuration matched by the keys, see find
 
         Args:
-            element_name: text in the element name, for example sensor.
-            manufacturer_name: text in the manufacturer name, None for any
-                manufacturer.
-            model_name: text in the model name, None for any model.
-            instconfig: text in the instconfig, None for any instconfig.
-            keys: texts found in the configuration, all of them. None for no keys.
+            element_name: element of the configuration, for example sensor.
+            keys: words and conditions, all of them.
+            prefixes: code table, for the condition names that are codes.
 
         Returns:
             the matching configuration.
 
         Raises:
             LookupError: if no configuration matches, or more than one. The message
-                lists the candidates, to pick the distinguishing keys.
+                gives the hints, or the parameters that still vary and the
+                candidates, to pick the distinguishing keys.
+            ValueError: if a condition name stands for several parameters, or a
+                range has no bound.
 
 
         """
-        configurations = [
-            configuration
-            for _, _, _, configuration in self.get_configurations(
-                element_name, manufacturer_name, model_name, instconfig, keys
-            )
-        ]
+        found = self.find(keys, prefixes, element_name)
 
-        match configurations:
-            case [configuration]:
+        match found.rows:
+            case [(*_, configuration)]:
                 resolved = configuration
             case []:
-                raise LookupError(
-                    f"No {element_name} configuration found for the given filters."
+                hints = "\n".join(f"  {hint}" for hint in found.hints)
+                raise LookupError(f"No {element_name} configuration matches.\n{hints}")
+            case rows:
+                # the parameters to add as keys, then a candidate for each line
+                varying = "\n".join(
+                    f"  {name}: {', '.join(values)}"
+                    for name, values in found.varying.items()
                 )
-            case _:
-                # a candidate for each line, the instconfigs are long
                 candidates = "\n".join(
                     f"  {configuration.instconfig}"
-                    for configuration in configurations[:MAX_CANDIDATES_SHOWN]
+                    for *_, configuration in rows[:MAX_CANDIDATES_SHOWN]
                 )
-                remaining = len(configurations) - MAX_CANDIDATES_SHOWN
+                remaining = len(rows) - MAX_CANDIDATES_SHOWN
                 more = f"\n  ...and {remaining} more" if remaining > 0 else ""
                 raise LookupError(
-                    f"Ambiguous {element_name} selection: {len(configurations)} "
-                    "configurations match the given filters. "
+                    f"Ambiguous {element_name} selection: {len(rows)} configurations "
+                    f"match. Still varying:\n{varying}\n"
                     f"Candidates:\n{candidates}{more}"
                 )
 

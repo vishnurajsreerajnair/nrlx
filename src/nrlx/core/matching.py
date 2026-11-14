@@ -170,23 +170,92 @@ def contains(text: str, query: str | None) -> bool:
     return contained
 
 
-def contains_keys(texts: list[str], keys: list[str]) -> bool:
-    """Whether each of the keys is contained in at least one of the texts
+def resolve_parameter(
+    name: str, codes: list[tuple[str, str]], parameter_names: list[str]
+) -> list[str]:
+    """Parameter names that the name of a condition stands for
 
-    The keys are unordered and case-insensitive, as the key lists of the ObsPy NRL
-    v1 client: every key must match, each in any of the texts. No keys match any
-    texts.
+    A code of the table (FR) stands for its parameter (Final_Sample_Rate); any other
+    name is a whole parameter name or the start of one of its words (corner for
+    Long-Period_Corner), case-insensitive.
 
     Args:
-        texts: texts to search, for example the names and parameters of a
-            configuration.
-        keys: texts to find.
+        name: name of the condition, for example FR or corner.
+        codes: code and parameter name of each code of the table.
+        parameter_names: parameter names of the configurations searched.
 
     Returns:
-        whether all the keys are found.
+        the parameter names, sorted: several when the name is ambiguous, none when
+        it is unknown.
 
 
     """
-    contained = all(any(contains(text, key) for text in texts) for key in keys)
+    lowered = name.lower()
 
-    return contained
+    # a code stands for its parameter, among the parameters searched
+    bycode = [
+        parameter
+        for code, parameter in codes
+        if code.lower() == lowered and parameter in parameter_names
+    ]
+
+    # a whole name, or the start of a word of the name
+    byname = [
+        parameter
+        for parameter in parameter_names
+        if parameter.lower() == lowered
+        or any(
+            word.startswith(lowered)
+            for word in parameter.lower().replace("-", "_").split("_")
+        )
+    ]
+    parameters = sorted(set(bycode or byname))
+
+    return parameters
+
+
+def sort_values(values: list[str]) -> list[str]:
+    """Distinct values of a parameter: the numbers by value, then the texts
+
+    Args:
+        values: values of a parameter, for example "100 Hz", "40 Hz", "40 Hz".
+
+    Returns:
+        the distinct values, sorted, for example "40 Hz", "100 Hz".
+
+
+    """
+    distinct = sorted(set(values))
+    numbers = sorted(
+        [
+            (number, value)
+            for value in distinct
+            if (number := to_number(value)) is not None
+        ]
+    )
+    texts = [value for value in distinct if to_number(value) is None]
+    sortedvalues = [value for _, value in numbers] + texts
+
+    return sortedvalues
+
+
+def varying_values(parameters: list[dict[str, str]]) -> dict[str, list[str]]:
+    """Values of each parameter that differs between configurations
+
+    Args:
+        parameters: parameters of each configuration, values by name.
+
+    Returns:
+        the sorted values of each parameter with more than one value, by name in
+        alphabetical order.
+
+
+    """
+    names = sorted({name for values in parameters for name in values})
+    found = {
+        name: sort_values([values[name] for values in parameters if name in values])
+        for name in names
+    }
+    varying = {name: values for name, values in found.items() if len(values) > 1}
+
+    return varying

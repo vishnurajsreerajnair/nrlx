@@ -1,10 +1,12 @@
-"""The library entry point: the catalog and the service, to build responses"""
+"""The library entry point: the catalog, its code table and the service"""
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import msgspec
+from obspy import Inventory
 
 from nrlx.core.combine import cascade_instconfig, combine_params
 from nrlx.io.cache import (
@@ -17,16 +19,15 @@ from nrlx.io.cache import (
     write_catalog,
     write_prefixes,
 )
+from nrlx.io.inventory import label_channels, read_stationxml, set_coordinates
 from nrlx.io.service import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, get
-from nrlx.models.catalog import Catalog
-from nrlx.models.instrument import Instrument
-from nrlx.models.response import BuiltResponse
+from nrlx.models.catalog import Catalog, Found
 from nrlx.schema.prefixes import PrefixInput
-from nrlx.schema.response import ResponseFormat
+from nrlx.schema.response import ResponseInput
 
 
 class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
-    """The NRL catalog and service, to find configurations and build responses
+    """The NRL catalog, its code table and the service, to find and build responses
 
     Args:
         catalog: catalog to resolve the selections.
@@ -124,78 +125,132 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
 
         return nrl
 
-    def combine(
+    def find(self, keys: list[str], element: str | None = None) -> Found:
+        """Configurations matched by keys, see Catalog.find
+
+        Args:
+            keys: words (luni, LP1) and conditions (FR=40, corner>=60), all of them.
+            element: element searched, for example sensor; None for every element.
+
+        Returns:
+            the matched rows, the parameters that still vary, the notes and the
+            hints.
+
+        Raises:
+            ValueError: if a condition name stands for several parameters, or a
+                range has no bound.
+
+
+        """
+        found = self.catalog.find(keys, self.prefixes, element)
+
+        return found
+
+    def response(
         self,
         *,
-        sensor_instconfig: str | None = None,
-        sensor_keys: list[str] | None = None,
-        datalogger_instconfig: str | None = None,
-        datalogger_keys: list[str] | None = None,
-        format: ResponseFormat = "stationxml",
-        compress: bool = False,
+        sensor: list[str] | None = None,
+        datalogger: list[str] | None = None,
+        integrated: list[str] | None = None,
+        soh: list[str] | None = None,
         network: str | None = None,
         station: str | None = None,
         location: str | None = None,
-        channel: str | None = None,
-        starttime: str | None = None,
-        endtime: str | None = None,
-    ) -> BuiltResponse:
-        """Build the response of a sensor, and datalogger, in memory
+        channels: list[str] | None = None,
+        starttime: datetime | None = None,
+        endtime: datetime | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        elevation: float = 0.0,
+        depth: float = 0.0,
+    ) -> Inventory:
+        """Response of the parts, with a channel for each code, in an Inventory
 
-        Each element is selected by an exact instconfig or by keys resolved in the
-        catalog (see Catalog.get_configurations), one or the other. The datalogger is
-        optional. The response is not written: see BuiltResponse.save, and the obspy
-        conversions.
+        Each part is resolved in the catalog before the request, so that a part
+        matching no configuration or several fails without network. The service
+        builds the response once; each channel code is a copy of it, and the labels
+        and the place are set on them. See ResponseInput for the arguments.
 
         Args:
-            sensor_instconfig: exact instconfig of the sensor.
-            sensor_keys: keys matching a single sensor configuration.
-            datalogger_instconfig: exact instconfig of the datalogger.
-            datalogger_keys: keys matching a single datalogger configuration.
-            format: format of the response.
-            compress: whether to request the response as a zip archive.
+            sensor: keys of the sensor, None without a sensor.
+            datalogger: keys of the datalogger, None without a datalogger.
+            integrated: keys of the integrated instrument, None without one.
+            soh: keys of the state of health channel, None without one.
             network: network code, None for the service placeholder.
             station: station code, None for the service placeholder.
             location: location code, None for the service placeholder.
-            channel: channel code, None for the service placeholder.
-            starttime: start of the validity, None for the service placeholder.
-            endtime: end of the validity, None for the service placeholder.
+            channels: channel codes, written as given; None for a single channel
+                with the service placeholder.
+            starttime: start of the validity, UTC; None for the service
+                placeholder.
+            endtime: end of the validity, UTC; None for no end.
+            latitude: latitude of the station in degrees, None for the service
+                placeholder.
+            longitude: longitude in degrees, given with the latitude.
+            elevation: elevation in metres, with the coordinates.
+            depth: depth of the sensors below the surface in metres, with the
+                coordinates.
 
         Returns:
-            the built response.
+            obspy inventory with the channels.
 
         Raises:
-            ValueError: if an element has both an instconfig and keys.
-            LookupError: if the keys match no configuration, or more than one.
+            ValueError: if the request is invalid (see ResponseInput), or a
+                condition name stands for several parameters.
+            LookupError: if a part matches no configuration, or more than one.
             httpx.HTTPError: if the service cannot be reached or answers with an
                 error status.
 
 
         """
-        # the exact instconfigs, resolved in the catalog before the request
-        sensor = Instrument(instconfig=sensor_instconfig, keys=sensor_keys or [])
-        sensorinstconfig = sensor.get_instconfig(self.catalog, "sensor")
-        dataloggerinstconfig = None
-        if datalogger_instconfig is not None or datalogger_keys:
-            datalogger = Instrument(
-                instconfig=datalogger_instconfig, keys=datalogger_keys or []
-            )
-            dataloggerinstconfig = datalogger.get_instconfig(self.catalog, "datalogger")
-
-        instconfig = cascade_instconfig(sensorinstconfig, dataloggerinstconfig)
-        params = combine_params(
-            instconfig,
-            format,
-            compress,
-            network,
-            station,
-            location,
-            channel,
-            starttime,
-            endtime,
+        request = ResponseInput(
+            sensor=sensor,
+            datalogger=datalogger,
+            integrated=integrated,
+            soh=soh,
+            network=network,
+            station=station,
+            location=location,
+            channels=channels or [],
+            starttime=starttime,
+            endtime=endtime,
+            latitude=latitude,
+            longitude=longitude,
+            elevation=elevation,
+            depth=depth,
         )
+
+        # the exact instconfigs, in the order of the signal, before any request
+        instconfigs = [
+            self.catalog.resolve(element, keys, self.prefixes).instconfig
+            for element, keys in [
+                ("sensor", request.sensor),
+                ("datalogger", request.datalogger),
+                ("integrated", request.integrated),
+                ("soh", request.soh),
+            ]
+            if keys is not None
+        ]
+        params = combine_params(cascade_instconfig(instconfigs))
         content = get(self.base_url, "combine", params, self.timeout)
 
-        response = BuiltResponse(content, format, instconfig, compress)
+        # a channel for each code, labelled, then placed
+        inventory = label_channels(
+            read_stationxml(content),
+            request.network,
+            request.station,
+            request.location,
+            request.channels,
+            request.starttime,
+            request.endtime,
+        )
+        if request.latitude is not None and request.longitude is not None:
+            inventory = set_coordinates(
+                inventory,
+                request.latitude,
+                request.longitude,
+                request.elevation,
+                request.depth,
+            )
 
-        return response
+        return inventory

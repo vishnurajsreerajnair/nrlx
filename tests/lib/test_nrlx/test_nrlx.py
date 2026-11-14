@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
+from obspy import UTCDateTime
 
 from nrlx.io.cache import get_catalog_file, get_prefixes_file
 from nrlx.models.nrlx import Nrlx
-from nrlx.models.response import BuiltResponse
 
 
 def test_from_cache(cache_root):
@@ -39,7 +41,7 @@ def test_sync_downloads_the_catalog_and_returns_a_ready_nrlx(
     assert get_prefixes_file(tmp_path).read_bytes() == prefixes_content
     assert len(nrl.prefixes) == 4
     assert fake_service.requests[1].params == {"format": "json", "nodata": 404}
-    assert nrl.catalog.resolve("sensor", model_name="STS-1").instconfig == (
+    assert nrl.catalog.resolve("sensor", ["STS-1"], nrl.prefixes).instconfig == (
         "sensor_Streckeisen_STS-1_LP360"
     )
 
@@ -66,40 +68,71 @@ def test_sync_invalid_code_table_keeps_both_previous_files(
     assert get_prefixes_file(cache_root).read_bytes() == prefixes_content
 
 
-def test_combine_requests_the_cascade_and_keeps_the_bytes_in_memory(nrl, fake_service):
-    fake_service.contents["combine"] = b"fake-response-bytes"
+SENSOR = "sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel"
+DATALOGGER = "datalogger_Quanterra_Q330_FV40Vpp_FR100"
 
-    response = nrl.combine(
-        sensor_instconfig="sensor_Streckeisen_STS-1_LP360",
-        datalogger_instconfig="datalogger_Quanterra_Q330_FV40Vpp_FR100",
+
+def test_find_uses_the_code_table(nrl):
+    found = nrl.find(["STS-2", "SG=1500"], "sensor")
+
+    assert [configuration.instconfig for *_, configuration in found.rows] == [SENSOR]
+
+
+def test_response_resolves_the_parts_and_asks_once(nrl, fake_service, make_stationxml):
+    fake_service.contents["combine"] = make_stationxml("ZZZ")
+
+    inventory = nrl.response(
+        sensor=["STS-2", "SG=1500"],
+        datalogger=["Q330"],
+        network="XY",
+        station="TST",
+        location="00",
+        channels=["HHZ", "HHN", "HHE"],
     )
 
-    assert response == BuiltResponse(
-        b"fake-response-bytes",
-        "stationxml",
-        "sensor_Streckeisen_STS-1_LP360:datalogger_Quanterra_Q330_FV40Vpp_FR100",
-    )
     [request] = fake_service.requests
     assert request.url.endswith("/combine")
-    assert request.params["instconfig"] == response.instconfig
+    assert request.params == {
+        "instconfig": f"{SENSOR}:{DATALOGGER}",
+        "format": "stationxml",
+        "nodata": 404,
+    }
+    [network] = inventory
+    [station] = network
+    assert (network.code, station.code) == ("XY", "TST")
+    assert [channel.code for channel in station] == ["HHZ", "HHN", "HHE"]
 
 
-def test_combine_resolves_the_keys(nrl, fake_service):
-    nrl.combine(sensor_keys=["STS-2", "1500"], datalogger_keys=["40Vpp"])
+def test_response_places_the_channels(nrl, fake_service, make_stationxml):
+    fake_service.contents["combine"] = make_stationxml("ZZZ")
 
-    [request] = fake_service.requests
-    assert request.params["instconfig"] == (
-        "sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel"
-        ":datalogger_Quanterra_Q330_FV40Vpp_FR100"
+    inventory = nrl.response(
+        sensor=["STS-2", "SG=1500"],
+        channels=["HHZ"],
+        starttime=datetime(2026, 1, 1),
+        latitude=45.6,
+        longitude=8.9,
+        elevation=210.0,
+        depth=2.0,
     )
 
+    channel = inventory[0][0][0]
+    assert (channel.latitude, channel.longitude, channel.elevation, channel.depth) == (
+        45.6,
+        8.9,
+        210.0,
+        2.0,
+    )
+    assert channel.start_date == UTCDateTime(2026, 1, 1)
 
-def test_combine_without_sensor_is_ambiguous(nrl, fake_service):
+
+def test_response_of_an_ambiguous_part_fails_before_any_request(nrl, fake_service):
     with pytest.raises(LookupError, match="Ambiguous sensor selection"):
-        nrl.combine()
+        nrl.response(sensor=["STS-2"])
     assert fake_service.requests == []
 
 
-def test_combine_rejects_instconfig_and_keys(nrl):
-    with pytest.raises(ValueError, match="not both"):
-        nrl.combine(sensor_instconfig="sensor_A", sensor_keys=["sensor"])
+def test_response_refuses_an_invalid_request(nrl, fake_service):
+    with pytest.raises(ValueError, match="go as a sensor"):
+        nrl.response(sensor=["STS-1"], soh=["temperature"])
+    assert fake_service.requests == []
