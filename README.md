@@ -58,15 +58,16 @@ Three terms cover everything nrlx does:
 - **instconfig** -> the exact identifier of one configuration, e.g.
   `sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel`. It is what `build`
   actually sends to IRIS. `browse` exists to help you find the right one.
-- **Local cache** -> nrlx keeps one copy of the catalog on disk (under your
-  platform cache dir) so browsing is instant and offline. `sync` refreshes it.
+- **Local cache** -> nrlx keeps one copy of the catalog and of its code table on
+  disk (under your platform cache dir) so browsing is instant and offline. `sync`
+  refreshes both.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
 | `nrlx status [--live]` | Show version and local cache info; `--live` also checks connectivity. |
-| `nrlx sync` | Download the current NRL catalog into the local cache. |
+| `nrlx sync` | Download the current NRL catalog and code table into the local cache. |
 | `nrlx browse <summary\|elements\|manufacturers\|models\|configs\|show>` | Browse the cached catalog; `show <instconfig>` prints one config's full parameters. |
 | `nrlx prefixes [query]` | Decode the two-letter parameter codes used in instconfigs (LP, FR, FV, ...). |
 | `nrlx build` | Build a sensor(+datalogger) response and save it to a file. |
@@ -123,7 +124,8 @@ STS-2 ...`), and both spellings accept either style.
 
 Candidate instconfigs are full of coded fragments like `LP120`, `FR500`, or
 `FV10Vpp`. Run `nrlx prefixes` (or `nrlx prefixes corner` to filter) to decode
-them — it fetches the official code table from the NRL service, e.g.
+them — it reads the official code table of the NRL service that `nrlx sync`
+saves, offline, e.g.
 LP = Long-Period Corner, FR = Final Sample Rate, FV = Full-Scale Voltage.
 
 ### Multiple channels

@@ -7,10 +7,14 @@ import pytest
 
 from nrlx.io.cache import (
     decode_catalog,
+    decode_prefixes,
     get_cache_root,
     get_catalog_file,
+    get_prefixes_file,
     read_catalog,
+    read_prefixes,
     write_catalog,
+    write_prefixes,
 )
 
 
@@ -106,3 +110,45 @@ def test_write_catalog_creates_the_folders(tmp_path):
 
     assert written == catalog_file
     assert catalog_file.read_bytes() == b"{}"
+
+
+def test_prefixes_file_layout(tmp_path):
+    assert get_prefixes_file(tmp_path) == tmp_path.resolve() / "nrl" / "prefixes.json"
+
+
+def test_read_prefixes(cache_root):
+    prefixes = read_prefixes(get_prefixes_file(cache_root))
+
+    assert [prefix.prefix for prefix in prefixes] == ["FR", "FV", "LP", "SG"]
+    assert prefixes[0].description == "Final_Sample_Rate"
+    assert prefixes[0].question == "What is the final sample rate?"
+
+
+def test_read_prefixes_missing_file_says_sync(tmp_path):
+    with pytest.raises(FileNotFoundError, match="Run 'nrlx sync'"):
+        read_prefixes(get_prefixes_file(tmp_path))
+
+
+@pytest.mark.parametrize("content", [b"", b"<html>maintenance</html>", b'{"a": 1}'])
+def test_read_prefixes_invalid_file(tmp_path, content):
+    prefixes_file = get_prefixes_file(tmp_path)
+    write_prefixes(content, prefixes_file)
+
+    with pytest.raises(ValueError, match="Invalid code table"):
+        read_prefixes(prefixes_file)
+
+
+def test_decode_prefixes_rejects_missing_description():
+    content = json.dumps([{"prefix": "FR"}]).encode()
+
+    with pytest.raises(msgspec.ValidationError, match="description"):
+        decode_prefixes(content)
+
+
+def test_write_prefixes_creates_the_folders(tmp_path):
+    prefixes_file = get_prefixes_file(tmp_path)
+
+    written = write_prefixes(b"[]", prefixes_file)
+
+    assert written == prefixes_file
+    assert prefixes_file.read_bytes() == b"[]"

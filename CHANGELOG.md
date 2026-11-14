@@ -36,9 +36,24 @@ changes as listed below.
   `BuildInput`. They are written on the station and on every channel of each
   StationXML (`io.inventory.set_coordinates`), merged or one per channel, instead
   of the service placeholders; they need the stationxml format, not zipped.
+- Matching of the keys in `core.matching`, the base of the coming `nrlx response`:
+  `split_condition` reads a condition on a parameter (`FR=40`, `corner>=60`, the
+  range `FR=100..500`), `compare` compares a parameter value with it, as numbers
+  when both are (`FR=40` is "40 Hz", not "400 Hz"), and `word_tier` finds a word
+  as a whole part of the instconfig or a whole name, else at the start of one, else
+  anywhere.
 
 ### Changed
 
+- **`nrlx sync` also saves the code table** of the instconfig parameters (the
+  `/prefix-lookup` endpoint) beside the catalog, `nrl/prefixes.json`; both are
+  validated before either is written, so a broken download keeps the previous
+  pair. `nrlx prefixes` reads it offline, with `--cache-root` instead of
+  `--base-url`, and `Nrlx` holds it in `prefixes` (`Nrlx.from_cache` reads it,
+  `Nrlx.sync` downloads it). A cache synced before this version has no table:
+  run `nrlx sync` once.
+- mypy checks with `python_version = "3.12"`, as the numpy stubs need: with 3.11
+  `mypy --strict` stopped on them before checking nrlx.
 - **obspy and msgspec are required**, and Python 3.11 or later: the `nrlx[obspy]`
   extra and the lazy obspy import are removed.
 - **The custom exceptions are removed** (`nrlx.exceptions`): nrlx raises

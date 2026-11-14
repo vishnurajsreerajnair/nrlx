@@ -1,4 +1,4 @@
-"""Commands of the NRL service and of the local catalog: status, sync, prefixes"""
+"""Commands of the NRL service and of the local cache: status, sync, prefixes"""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Annotated
 
 import httpx
-import msgspec
 import typer
 from rich.console import Console
 from rich.markup import escape
@@ -15,10 +14,14 @@ from rich.table import Table
 
 import nrlx
 from nrlx.core.matching import contains
-from nrlx.io.cache import get_cache_root, get_catalog_file
+from nrlx.io.cache import (
+    get_cache_root,
+    get_catalog_file,
+    get_prefixes_file,
+    read_prefixes,
+)
 from nrlx.io.service import DEFAULT_BASE_URL, get
 from nrlx.models.nrlx import Nrlx
-from nrlx.schema.prefixes import PrefixInput
 
 console = Console()
 errconsole = Console(stderr=True)
@@ -77,11 +80,11 @@ def sync(
         typer.Option("--base-url", help="NRL web service base URL."),
     ] = DEFAULT_BASE_URL,
 ) -> None:
-    """Download the current NRL catalog into the local cache.
+    """Download the current NRL catalog and code table into the local cache.
 
     Creates the cache directory first if it doesn't exist yet - safe to run
     on a fresh machine, and safe to re-run any time to refresh the catalog.
-    The download is validated first: a broken one keeps the previous catalog.
+    The download is validated first: a broken one keeps the previous files.
 
 
     """
@@ -102,7 +105,8 @@ def sync(
         Panel.fit(
             "Catalog synced\n\n"
             f"File: {escape(str(get_catalog_file(cache_root)))}\n"
-            f"Configurations: {len(configurations)}",
+            f"Configurations: {len(configurations)}\n"
+            f"Codes: {len(nrl.prefixes)}",
             title="nrlx",
             border_style="green",
         )
@@ -114,34 +118,24 @@ def prefixes(
         str | None,
         typer.Argument(help="Filter by prefix or meaning, e.g. LP or 'corner'."),
     ] = None,
-    base_url: Annotated[
-        str,
-        typer.Option("--base-url", help="NRL web service base URL."),
-    ] = DEFAULT_BASE_URL,
+    cache_root: Annotated[
+        Path | None,
+        typer.Option("--cache-root", help="Custom cache root directory."),
+    ] = None,
 ) -> None:
     """Explain the two-letter parameter codes inside instconfig strings.
 
     instconfigs pack their parameters into coded fragments - LP120 means
     Long-Period Corner of 120 s, FR500 a Final Sample Rate of 500 Hz, FV10Vpp
-    a Full-Scale Voltage of 10 Vpp. This fetches the official code table from
-    the NRL service, so you can decode candidate lists and pick better keys.
+    a Full-Scale Voltage of 10 Vpp. This reads the official code table that
+    'nrlx sync' saves, so you can decode candidate lists and pick better keys.
 
 
     """
     try:
-        content = get(base_url, "prefix-lookup", {"format": "json", "nodata": 404})
-        rows = msgspec.json.decode(content, type=list[PrefixInput])
-    except httpx.HTTPError as err:
-        errconsole.print(
-            f"[bold red]Error:[/bold red] NRL service request failed "
-            f"({escape(base_url)}). {escape(str(err))}"
-        )
-        raise typer.Exit(code=1) from err
-    except msgspec.DecodeError as err:
-        errconsole.print(
-            "[bold red]Error:[/bold red] Invalid prefix table from the NRL service. "
-            f"{escape(str(err))}"
-        )
+        rows = read_prefixes(get_prefixes_file(cache_root))
+    except (OSError, ValueError) as err:
+        errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
         raise typer.Exit(code=1) from err
 
     table = Table(title="NRL instconfig parameter prefixes")

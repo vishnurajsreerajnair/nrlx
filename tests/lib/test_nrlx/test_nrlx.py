@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from nrlx.io.cache import get_catalog_file
+from nrlx.io.cache import get_catalog_file, get_prefixes_file
 from nrlx.models.nrlx import Nrlx
 from nrlx.models.response import BuiltResponse
 
@@ -12,6 +12,7 @@ def test_from_cache(cache_root):
 
     assert nrl.base_url == "https://isamgeo.in/nrl/"
     assert len(nrl.catalog.get_configurations()) == 5
+    assert [prefix.prefix for prefix in nrl.prefixes] == ["FR", "FV", "LP", "SG"]
 
 
 def test_from_cache_without_catalog_says_sync(tmp_path):
@@ -19,14 +20,25 @@ def test_from_cache_without_catalog_says_sync(tmp_path):
         Nrlx.from_cache(tmp_path)
 
 
+def test_from_cache_without_code_table_says_sync(cache_root):
+    get_prefixes_file(cache_root).unlink()
+
+    with pytest.raises(FileNotFoundError, match="Code table not found"):
+        Nrlx.from_cache(cache_root)
+
+
 def test_sync_downloads_the_catalog_and_returns_a_ready_nrlx(
-    tmp_path, fake_service, catalog_content
+    tmp_path, fake_service, catalog_content, prefixes_content
 ):
     fake_service.contents["catalog"] = catalog_content
+    fake_service.contents["prefix-lookup"] = prefixes_content
 
     nrl = Nrlx.sync(tmp_path)
 
     assert get_catalog_file(tmp_path).read_bytes() == catalog_content
+    assert get_prefixes_file(tmp_path).read_bytes() == prefixes_content
+    assert len(nrl.prefixes) == 4
+    assert fake_service.requests[1].params == {"format": "json", "nodata": 404}
     assert nrl.catalog.resolve("sensor", model_name="STS-1").instconfig == (
         "sensor_Streckeisen_STS-1_LP360"
     )
@@ -40,6 +52,18 @@ def test_sync_keeps_the_previous_catalog_on_invalid_download(
     with pytest.raises(ValueError, match="Invalid catalog"):
         Nrlx.sync(cache_root)
     assert get_catalog_file(cache_root).read_bytes() == catalog_content
+
+
+def test_sync_invalid_code_table_keeps_both_previous_files(
+    cache_root, fake_service, catalog_content, prefixes_content
+):
+    fake_service.contents["catalog"] = catalog_content.replace(b"STS-1", b"STS-9")
+    fake_service.contents["prefix-lookup"] = b"<html>maintenance</html>"
+
+    with pytest.raises(ValueError, match="Invalid code table"):
+        Nrlx.sync(cache_root)
+    assert get_catalog_file(cache_root).read_bytes() == catalog_content
+    assert get_prefixes_file(cache_root).read_bytes() == prefixes_content
 
 
 def test_combine_requests_the_cascade_and_keeps_the_bytes_in_memory(nrl, fake_service):

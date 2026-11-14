@@ -7,11 +7,21 @@ from pathlib import Path
 import msgspec
 
 from nrlx.core.combine import cascade_instconfig, combine_params
-from nrlx.io.cache import decode_catalog, get_catalog_file, read_catalog, write_catalog
+from nrlx.io.cache import (
+    decode_catalog,
+    decode_prefixes,
+    get_catalog_file,
+    get_prefixes_file,
+    read_catalog,
+    read_prefixes,
+    write_catalog,
+    write_prefixes,
+)
 from nrlx.io.service import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, get
 from nrlx.models.catalog import Catalog
 from nrlx.models.instrument import Instrument
 from nrlx.models.response import BuiltResponse
+from nrlx.schema.prefixes import PrefixInput
 from nrlx.schema.response import ResponseFormat
 
 
@@ -20,6 +30,8 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
 
     Args:
         catalog: catalog to resolve the selections.
+        prefixes: codes of the instconfig parameters, for the conditions on the
+            parameters (FR=40). Empty when not loaded.
         base_url: base URL of the NRL service.
         timeout: timeout of the requests in seconds.
 
@@ -27,6 +39,7 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
     """
 
     catalog: Catalog
+    prefixes: list[PrefixInput] = []
     base_url: str = DEFAULT_BASE_URL
     timeout: float = DEFAULT_TIMEOUT
 
@@ -37,7 +50,7 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
         *,
         base_url: str = DEFAULT_BASE_URL,
     ) -> Nrlx:
-        """Load the catalog already in the cache, without requests
+        """Load the catalog and the code table already in the cache, without requests
 
         Args:
             cache_root: custom root folder of the cache, None for the platform cache
@@ -45,17 +58,19 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             base_url: base URL of the NRL service.
 
         Returns:
-            Nrlx with the catalog of the cache.
+            Nrlx with the catalog and the code table of the cache.
 
         Raises:
-            FileNotFoundError: if the catalog has not been synced yet.
-            ValueError: if the catalog file is not valid.
-            OSError: if the catalog file cannot be read.
+            FileNotFoundError: if the catalog or the code table has not been synced
+                yet (the caches synced before nrlx 0.3 have no code table).
+            ValueError: if the catalog or the code table is not valid.
+            OSError: if a file cannot be read.
 
 
         """
         catalog = read_catalog(get_catalog_file(cache_root))
-        nrl = cls(catalog=catalog, base_url=base_url)
+        prefixes = read_prefixes(get_prefixes_file(cache_root))
+        nrl = cls(catalog=catalog, prefixes=prefixes, base_url=base_url)
 
         return nrl
 
@@ -66,10 +81,11 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
         *,
         base_url: str = DEFAULT_BASE_URL,
     ) -> Nrlx:
-        """Download the current catalog in the cache, then load it
+        """Download the current catalog and code table in the cache, then load them
 
-        The catalog is validated before it is written, so a broken download leaves
-        the previous catalog in the cache. Safe on a fresh machine and to refresh.
+        Both are validated before either is written, so a broken download leaves the
+        previous files in the cache, together. Safe on a fresh machine and to
+        refresh.
 
         Args:
             cache_root: custom root folder of the cache, None for the platform cache
@@ -77,26 +93,34 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             base_url: base URL of the NRL service.
 
         Returns:
-            Nrlx with the downloaded catalog.
+            Nrlx with the downloaded catalog and code table.
 
         Raises:
             httpx.HTTPError: if the service cannot be reached or answers with an
                 error status.
-            ValueError: if the download is not a valid catalog.
-            OSError: if the catalog file cannot be written.
+            ValueError: if the download is not a valid catalog or code table.
+            OSError: if the files cannot be written.
 
 
         """
-        content = get(base_url, "catalog")
+        catalogcontent = get(base_url, "catalog")
+        prefixescontent = get(
+            base_url, "prefix-lookup", {"format": "json", "nodata": 404}
+        )
 
-        # validated before replacing the previous catalog
+        # both validated before replacing the previous files
         try:
-            catalog = decode_catalog(content)
+            catalog = decode_catalog(catalogcontent)
         except msgspec.DecodeError as err:
             raise ValueError(f"Invalid catalog from {base_url}. {err}") from err
-        write_catalog(content, get_catalog_file(cache_root))
+        try:
+            prefixes = decode_prefixes(prefixescontent)
+        except msgspec.DecodeError as err:
+            raise ValueError(f"Invalid code table from {base_url}. {err}") from err
+        write_catalog(catalogcontent, get_catalog_file(cache_root))
+        write_prefixes(prefixescontent, get_prefixes_file(cache_root))
 
-        nrl = cls(catalog=catalog, base_url=base_url)
+        nrl = cls(catalog=catalog, prefixes=prefixes, base_url=base_url)
 
         return nrl
 

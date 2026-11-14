@@ -1,0 +1,6 @@
+[
+  {"prefix": "FR", "description": "Final_Sample_Rate", "question": "What is the final sample rate?"},
+  {"prefix": "FV", "description": "Full-Scale_Voltage", "question": "What is the full-scale voltage?"},
+  {"prefix": "LP", "description": "Long-Period_Corner", "question": "What is the long-period corner?"},
+  {"prefix": "SG", "description": "Sensitivity", "question": "What is the sensitivity?", "added_upstream": true}
+]

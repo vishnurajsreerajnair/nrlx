@@ -28,7 +28,7 @@ Each layer imports only the ones below it.
 - `src/nrlx/schema/`: msgspec structs of every input (`...Input` classes). `catalog`, `prefixes` and `cache` mirror the NRL service JSON; `instrument` and `build` are the requests, with their validation. `response` holds the `ResponseFormat` literal.
 - `src/nrlx/models/`: models subclassing the input structs with the methods (`Catalog.get_configurations`, `Catalog.resolve`, `Instrument.get_instconfig`, `Build.build`), plus the library entry points `Nrlx` (catalog and service) and `BuiltResponse` (a response with its obspy conversions).
 - `src/nrlx/core/`: pure functions taking their arguments one by one, independent of the structs: matching (`contains`, `contains_keys`), `/combine` parameters, doctor checks.
-- `src/nrlx/io/`: the NRL service (`get`, `get_url`), the local cache (paths, `read_catalog`, `decode_catalog`, `write_catalog`), obspy reading, merging and placing (coordinates) of StationXML.
+- `src/nrlx/io/`: the NRL service (`get`, `get_url`), the local cache (paths, `read_catalog`, `decode_catalog`, `write_catalog`, and the same for the code table: `read_prefixes`, `decode_prefixes`, `write_prefixes`), obspy reading, merging and placing (coordinates) of StationXML.
 - `src/nrlx/tools/cmd/`: the typer commands. `__init__.py` builds the `nrlx` app (entry point `nrlx.tools.cmd:app`) from the modules `catalog` (status, sync, prefixes), `browse`, `build` and `doctor`.
 
 ## Schema conventions

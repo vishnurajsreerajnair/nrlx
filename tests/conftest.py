@@ -15,7 +15,7 @@ from obspy.core.inventory.response import (
     Response,
 )
 
-from nrlx.io.cache import decode_catalog
+from nrlx.io.cache import decode_catalog, decode_prefixes
 from nrlx.models.catalog import Catalog
 from nrlx.models.nrlx import Nrlx
 
@@ -101,19 +101,26 @@ def catalog(catalog_content) -> Catalog:
 
 
 @pytest.fixture
-def cache_root(tmp_path, catalog_content) -> Path:
-    """Cache root folder with catalog_content synced"""
+def prefixes_content() -> bytes:
+    """JSON code table with 4 codes, FR, FV, LP and SG (with a field added upstream)"""
+    return (DATA_DIR / "valid_prefixes.json").read_bytes()
+
+
+@pytest.fixture
+def cache_root(tmp_path, catalog_content, prefixes_content) -> Path:
+    """Cache root folder with catalog_content and prefixes_content synced"""
     root = tmp_path / "cache"
     (root / "nrl").mkdir(parents=True)
     (root / "nrl" / "catalog.json").write_bytes(catalog_content)
+    (root / "nrl" / "prefixes.json").write_bytes(prefixes_content)
 
     return root
 
 
 @pytest.fixture
-def nrl(catalog) -> Nrlx:
-    """Nrlx with the catalog, on the default service"""
-    return Nrlx(catalog=catalog)
+def nrl(catalog, prefixes_content) -> Nrlx:
+    """Nrlx with the catalog and the code table, on the default service"""
+    return Nrlx(catalog=catalog, prefixes=decode_prefixes(prefixes_content))
 
 
 # responses
