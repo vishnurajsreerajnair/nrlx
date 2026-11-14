@@ -504,3 +504,26 @@ def test_response_checks_the_labels_before_any_table(cache_root, fake_service):
     assert result.exit_code == 1
     assert "The channels must be unique" in result.output
     assert "configuration" not in result.output
+
+
+def test_response_writes_sacpz(cache_root, fake_service, make_stationxml, tmp_path):
+    fake_service.contents["combine"] = make_stationxml("ZZZ")
+    output = tmp_path / "st.pz"
+
+    result = runner.invoke(
+        app,
+        [
+            "response",
+            "--sensor",
+            "STS-1",
+            "-o",
+            str(output),
+            "--cache-root",
+            str(cache_root),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    text = output.read_text()
+    assert "* CHANNEL     : ZZZ" in text
+    assert "CONSTANT" in text

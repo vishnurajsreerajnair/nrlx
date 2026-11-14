@@ -9,7 +9,7 @@ from typing import Literal
 import msgspec
 from obspy.core.inventory.response import Response
 
-ResponseFormat = Literal["resp", "stationxml"]
+ResponseFormat = Literal["resp", "stationxml", "sacpz"]
 
 # where the NRL parts come from: the service, or the local copy
 Source = Literal["service", "local"]

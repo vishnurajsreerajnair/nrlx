@@ -54,3 +54,13 @@ def test_doctor_html_saved_as_xml(tmp_path):
 
     assert result.exit_code == 1
     assert "No Response element found." in result.output
+
+
+def test_doctor_refuses_sacpz(tmp_path):
+    path = tmp_path / "station.pz"
+    path.write_text("ZEROS 0\nPOLES 0\nCONSTANT 1.0\n")
+
+    result = runner.invoke(app, ["doctor", str(path), "--format", "sacpz"])
+
+    assert result.exit_code == 1
+    assert "nrlx doctor does not check SACPZ files yet." in result.output

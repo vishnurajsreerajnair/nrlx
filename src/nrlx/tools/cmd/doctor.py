@@ -36,11 +36,10 @@ def doctor(
         if response_format is None:
             response_format = infer_format(file)
         content = file.read_bytes()
+        findings = check_response(content, response_format)
     except (OSError, ValueError) as err:
         errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
         raise typer.Exit(code=1) from err
-
-    findings = check_response(content, response_format)
 
     table = Table(title=f"Health check: {escape(str(file))}")
     table.add_column("Severity")

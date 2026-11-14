@@ -18,8 +18,8 @@ command, `nrlx response`; the Python API changes as listed below.
   the parameters that still vary (by code), up to 20 one per row, one in full with
   every parameter; notes on loose words, hints when nothing matches (exit 1). When
   every part matches one configuration it prints the command line with the
-  instconfigs; with `-o FILE` it writes the response, `.xml` for StationXML or
-  `.resp` for RESP (`--format` overrides), every channel in one file or one per
+  instconfigs; with `-o FILE` it writes the response, `.xml` for StationXML,
+  `.resp` for RESP or `.pz` for SACPZ (`--format` overrides), every channel in one file or one per
   channel with `--split` (`st_XY.TST.00.HHZ.xml`). `--channels` are written as
   given, with a note when a band code does not fit the sample rate (SEED norm,
   `core.seed.band_codes`). `-i` asks the parts (manufacturer, model, then each
@@ -31,6 +31,28 @@ command, `nrlx response`; the Python API changes as listed below.
   command line keeps the file options. The rules of the parts, the labels, the
   times and the place (`ResponseInput`) are checked before any table, so a wrong
   request fails before suggesting `-o FILE`; `-i` refuses the file options.
+- **`nrlx convert IN -o OUT`**, conversion of a response file obspy reads
+  (StationXML, RESP, dataless SEED, XSEED, SC3ML) to StationXML, RESP or SACPZ,
+  the format from the extension (`.xml`, `.resp`, `.pz` or `.sacpz`; `--format`
+  overrides), every channel in one file or one per channel with `--split`,
+  `IN#NET.STA.LOC.CHA` for one channel. The file written is read back and
+  compared with the input (`io.inventory.verify_written`): StationXML and RESP
+  must give the same curve within 1e-9 at 60 frequencies up to 0.4 of the rate
+  (the same coefficients for a polynomial), or the command fails and keeps the
+  file to look at. SACPZ keeps the first poles and zeros stage and the overall
+  sensitivity: a note says how many stages it drops and how far it is from the
+  whole response, in band and at the top (an STS-2 on a Q330 at 40 sps: within
+  4.9 % up to 3.6 Hz, 28.9 % at 16 Hz). SACPZ refuses, before writing, the
+  channels obspy would skip silently: without poles and zeros, or with an input
+  other than m, m/s or m/s**2 (a pressure sensor, a polynomial).
+  `nrlx response -o FILE.pz` writes SACPZ too; `nrlx doctor` refuses it for now.
+  `io.inventory.read_channels(path, seed_id)` reads every channel of a file or
+  those of a SEED id, `write_inventory(inventory, path, format)` writes the three
+  formats, `io.sacpz.read_sacpz(text)` reads SACPZ (which obspy writes but does
+  not read), and `core.convert` has `output_format` and the amplitudes of the
+  check (`pz_amplitude`, `relative_difference`, `check_frequencies`). The tests
+  make their dataless SEED at run time, from the RESP of `tests/data`, with
+  obspy's `Parser.write_seed`.
 - **Notes on the responses kept as received**, `core.combine.received_notes`:
   the responses nrlx does not combine itself (the service's, and a part alone
   from the local copy) are written as the NRL gives them, and `Nrlx.response`
@@ -185,8 +207,8 @@ command, `nrlx response`; the Python API changes as listed below.
   doctor checks to `nrlx.core.doctor` and the CLI to `nrlx.tools.cmd` (the
   `nrlx` entry point is `nrlx.tools.cmd:app`). `from nrlx import Nrlx,
   BuiltResponse, Catalog, ResponseFormat` keeps working.
-- `ResponseFormat` is a `Literal["resp", "stationxml"]` instead of an enum: pass
-  `format="resp"` instead of `ResponseFormat.RESP`. `stationxml-resp`, left from
+- `ResponseFormat` is a `Literal["resp", "stationxml", "sacpz"]` instead of an
+  enum: pass `format="resp"` instead of `ResponseFormat.RESP`. `stationxml-resp`, left from
   `nrlx build`, is removed: `nrlx doctor --format` takes `resp` or `stationxml`,
   as `nrlx response` does.
 - `Catalog` is the decoded JSON tree: `get_elements`, `get_manufacturers`,

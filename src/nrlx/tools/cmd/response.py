@@ -9,7 +9,6 @@ from typing import Annotated
 
 import httpx
 import typer
-from obspy import Inventory
 from obspy.core.inventory.response import Response
 from rich.console import Console
 from rich.markup import escape
@@ -17,15 +16,15 @@ from rich.panel import Panel
 from rich.prompt import IntPrompt, Prompt
 from rich.table import Table
 
+from nrlx.core.convert import output_format
 from nrlx.core.matching import varying_values
 from nrlx.core.seed import band_codes
-from nrlx.io.inventory import read_part
-from nrlx.io.resp import write_resp
+from nrlx.io.inventory import read_part, split_channels, write_inventory
 from nrlx.io.service import DEFAULT_BASE_URL
 from nrlx.models.catalog import Found
 from nrlx.models.nrlx import Nrlx
 from nrlx.schema.prefixes import PrefixInput
-from nrlx.schema.response import ResponseInput, Source
+from nrlx.schema.response import ResponseFormat, ResponseInput, Source
 
 console = Console()
 errconsole = Console(stderr=True)
@@ -99,12 +98,13 @@ def response(
         typer.Option(
             "--output",
             "-o",
-            help="Write the response: .xml for StationXML, .resp for RESP.",
+            help="Write the response: .xml for StationXML, .resp for RESP, .pz for "
+            "SACPZ.",
         ),
     ] = None,
     response_format: Annotated[
-        str | None,
-        typer.Option("--format", help="stationxml or resp, instead of the extension."),
+        ResponseFormat | None,
+        typer.Option("--format", help="Instead of the extension (.xml, .resp, .pz)."),
     ] = None,
     split: Annotated[
         bool,
@@ -373,7 +373,7 @@ def write(
     elevation: float,
     depth: float,
     output: Path,
-    response_format: str | None,
+    response_format: ResponseFormat | None,
     split: bool,
 ) -> None:
     """Build the response and write its file or files
@@ -396,29 +396,22 @@ def write(
         elevation: elevation in metres.
         depth: depth below the surface in metres.
         output: file to write, the name of each file with --split.
-        response_format: stationxml or resp, None for the extension of the file.
+        response_format: stationxml, resp or sacpz; None for the extension of the
+            file.
         split: whether to write one file per channel.
 
 
     """
     # the format, from the option or the extension
-    match (response_format, output.suffix.lower()):
-        case ("stationxml", _) | (None, ".xml"):
-            fileformat = "stationxml"
-        case ("resp", _) | (None, ".resp"):
-            fileformat = "resp"
-        case (None, suffix):
-            errconsole.print(
-                f"[bold red]Error:[/bold red] Cannot tell the format from "
-                f"{escape(suffix or 'no extension')}: use .xml or .resp, or --format."
-            )
-            raise typer.Exit(code=1)
-        case (other, _):
-            errconsole.print(
-                f"[bold red]Error:[/bold red] Unknown format {escape(other)}: "
-                "stationxml or resp."
-            )
-            raise typer.Exit(code=1)
+    try:
+        fileformat = (
+            response_format
+            if response_format is not None
+            else output_format(output.suffix)
+        )
+    except ValueError as err:
+        errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
+        raise typer.Exit(code=1) from err
 
     parts = {part: partkeys for part, partkeys in given}
     try:
@@ -465,12 +458,8 @@ def write(
     try:
         for path, content in files:
             path.parent.mkdir(parents=True, exist_ok=True)
-            match fileformat:
-                case "stationxml":
-                    content.write(str(path), format="STATIONXML")
-                case _:
-                    path.write_text(write_resp(content))
-    except OSError as err:
+            write_inventory(content, path, fileformat)
+    except (OSError, ValueError) as err:
         errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
         raise typer.Exit(code=1) from err
 
@@ -496,35 +485,6 @@ def write(
             border_style="green",
         )
     )
-
-
-def split_channels(inventory: Inventory) -> list[tuple[str, Inventory]]:
-    """Each channel of an inventory in an inventory of its own, with its SEED id
-
-    Args:
-        inventory: inventory of a response, a station.
-
-    Returns:
-        the SEED id NET.STA.LOC.CHA and the inventory of each channel.
-
-
-    """
-    singles = list()
-    for network in inventory:
-        for station in network:
-            for channel in station:
-                # the inventory, with this network, station and channel only
-                single = inventory.copy()
-                single.networks = [network.copy()]
-                single[0].stations = [station.copy()]
-                single[0][0].channels = [channel.copy()]
-                seedid = (
-                    f"{network.code}.{station.code}."
-                    f"{channel.location_code}.{channel.code}"
-                )
-                singles.append((seedid, single))
-
-    return singles
 
 
 def show_tree(nrl: Nrlx) -> None:

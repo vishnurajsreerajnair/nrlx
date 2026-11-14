@@ -15,8 +15,10 @@ from obspy.core.inventory.response import (
     PolesZerosResponseStage,
     Response,
 )
+from obspy.io.xseed import Parser
 
 from nrlx.io.cache import decode_catalog, decode_prefixes
+from nrlx.io.inventory import label_channels, read_stationxml
 from nrlx.models.catalog import Catalog
 from nrlx.models.nrlx import Nrlx
 from nrlx.schema.prefixes import PrefixInput
@@ -202,6 +204,35 @@ def make_stationxml() -> Callable[[str], bytes]:
         return buffer.getvalue()
 
     return make
+
+
+@pytest.fixture
+def dataless_seed(tmp_path) -> Path:
+    """Path of a dataless SEED of XX.YY.00.ZZZ, STS-2 and Q330 in 4 stages, written
+    by obspy from the RESP of the test data"""
+    path = tmp_path / "sts2_q330.dataless"
+    Parser(str(DATA_DIR / "nrl_sts2_q330.resp")).write_seed(str(path))
+
+    return path
+
+
+@pytest.fixture
+def station_xml(tmp_path) -> Path:
+    """Path of a StationXML of XY.T13.00.HHZ, HHN and HHE, STS-2 and Q330 in 4
+    stages"""
+    inventory = label_channels(
+        read_stationxml((DATA_DIR / "nrl_sts2_q330.xml").read_bytes()),
+        "XY",
+        "T13",
+        "00",
+        ["HHZ", "HHN", "HHE"],
+        None,
+        None,
+    )
+    path = tmp_path / "station.xml"
+    inventory.write(str(path), format="STATIONXML")
+
+    return path
 
 
 # local copy of the NRL

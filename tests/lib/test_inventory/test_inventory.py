@@ -10,9 +10,13 @@ from obspy import UTCDateTime
 from nrlx.io.inventory import (
     label_channels,
     placeholder_inventory,
+    read_channels,
     read_part,
     read_stationxml,
     set_coordinates,
+    split_channels,
+    verify_written,
+    write_inventory,
 )
 
 DATA_DIR = Path(__file__).parents[2] / "data"
@@ -149,3 +153,112 @@ def test_placeholder_inventory_has_the_shape_of_the_service():
     assert channel.start_date == expected.start_date
     assert channel.sample_rate == 100.0
     assert channel.response is response
+
+
+def test_read_channels_keeps_every_channel_or_one(station_xml):
+    every = read_channels(station_xml)
+    one = read_channels(station_xml, "XY.T13.00.HHN")
+
+    assert [cha.code for cha in every[0][0]] == ["HHZ", "HHN", "HHE"]
+    assert [cha.code for cha in one[0][0]] == ["HHN"]
+
+
+def test_read_channels_unknown_seed_id_lists_the_channels(station_xml):
+    with pytest.raises(LookupError, match=r"No channel XY.T13.00.BHZ in .*HHE"):
+        read_channels(station_xml, "XY.T13.00.BHZ")
+
+
+def test_read_channels_unknown_format(tmp_path):
+    path = tmp_path / "notes.txt"
+    path.write_text("not a response")
+
+    with pytest.raises(ValueError, match="Cannot read"):
+        read_channels(path)
+
+
+def test_read_channels_reads_dataless_seed(dataless_seed):
+    inventory = read_channels(dataless_seed)
+
+    [channel] = inventory[0][0]
+    assert len(channel.response.response_stages) == 4
+
+
+def test_split_channels_names_each_inventory_by_its_seed_id(station_xml):
+    parts = split_channels(read_channels(station_xml))
+
+    assert [seedid for seedid, _ in parts] == [
+        "XY.T13.00.HHZ",
+        "XY.T13.00.HHN",
+        "XY.T13.00.HHE",
+    ]
+    assert [len(single[0][0]) for _, single in parts] == [1, 1, 1]
+
+
+def test_stationxml_to_resp_and_back_reads_back_the_same(station_xml, tmp_path):
+    inventory = read_channels(station_xml)
+    resp = write_inventory(inventory, tmp_path / "station.resp", "resp")
+    notes = verify_written(inventory, resp, "resp")
+    again = read_channels(resp)
+    xml = write_inventory(again, tmp_path / "again.xml", "stationxml")
+
+    assert notes == []
+    assert verify_written(again, xml, "stationxml") == []
+    assert read_channels(xml)[0][0][0].response.instrument_sensitivity.value == (
+        inventory[0][0][0].response.instrument_sensitivity.value
+    )
+
+
+def test_dataless_seed_to_stationxml_reads_back_the_same(dataless_seed, tmp_path):
+    inventory = read_channels(dataless_seed)
+    xml = write_inventory(inventory, tmp_path / "station.xml", "stationxml")
+
+    assert verify_written(inventory, xml, "stationxml") == []
+
+
+def test_polynomial_to_resp_reads_back_the_same(tmp_path):
+    # obspy reads the polynomial of RESP as a stage 0
+    inventory = read_channels(DATA_DIR / "nrl_poly.xml")
+    resp = write_inventory(inventory, tmp_path / "poly.resp", "resp")
+
+    assert verify_written(inventory, resp, "resp") == []
+
+
+def test_verify_written_fails_on_a_file_that_reads_back_different(
+    station_xml, tmp_path
+):
+    inventory = read_channels(station_xml, "XY.T13.00.HHZ")
+    resp = write_inventory(inventory, tmp_path / "station.resp", "resp")
+    text = resp.read_text()
+    resp.write_text(text.replace("+1.500000000000000E+03", "+1.501000000000000E+03", 1))
+
+    with pytest.raises(ValueError, match="XY.T13.00.HHZ reads back 6.7e-04"):
+        verify_written(inventory, resp, "resp")
+
+
+def test_sacpz_notes_what_it_drops(station_xml, tmp_path):
+    inventory = read_channels(station_xml, "XY.T13.00.HHZ")
+    pz = write_inventory(inventory, tmp_path / "station.pz", "sacpz")
+
+    [note] = verify_written(inventory, pz, "sacpz")
+
+    assert note.startswith(
+        "XY.T13.00.HHZ: SACPZ keeps stage 1 and the overall sensitivity, and drops "
+        "the other 3 stages: within "
+    )
+    assert note.endswith("at 16 Hz")
+
+
+def test_sacpz_refuses_a_channel_without_poles_and_zeros(tmp_path):
+    inventory = read_channels(DATA_DIR / "nrl_poly.xml")
+
+    with pytest.raises(ValueError, match="SACPZ holds only .* not XX.YY.00.ZZZ"):
+        write_inventory(inventory, tmp_path / "poly.pz", "sacpz")
+    assert not (tmp_path / "poly.pz").exists()
+
+
+def test_write_inventory_refuses_a_channel_without_response(station_xml, tmp_path):
+    inventory = read_channels(station_xml, "XY.T13.00.HHE")
+    inventory[0][0][0].response = None
+
+    with pytest.raises(ValueError, match="No response to write for XY.T13.00.HHE"):
+        write_inventory(inventory, tmp_path / "station.xml", "stationxml")

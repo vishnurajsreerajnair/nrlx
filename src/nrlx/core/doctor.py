@@ -62,6 +62,9 @@ def check_response(
     Returns:
         severity and message of each check, in check order.
 
+    Raises:
+        ValueError: for a SACPZ file, which doctor does not check yet.
+
 
     """
     match format:
@@ -69,6 +72,8 @@ def check_response(
             findings = check_resp(content)
         case "stationxml":
             findings = check_stationxml(content)
+        case "sacpz":
+            raise ValueError("nrlx doctor does not check SACPZ files yet.")
 
     return findings
 

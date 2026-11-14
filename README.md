@@ -67,7 +67,8 @@ builds are obspy objects in memory (see [Python library](#python-library)).
 | `nrlx status [--live]` | Show version and local cache info; `--live` also checks the service. |
 | `nrlx sync` | Download the current NRL catalog and code table into the local cache. |
 | `nrlx prefixes [query]` | Decode the two-letter parameter codes of the instconfigs (LP, FR, FV, ...). |
-| `nrlx response` | Find configurations by keys, and write their response (StationXML or RESP). |
+| `nrlx response` | Find configurations by keys, and write their response (StationXML, RESP or SACPZ). |
+| `nrlx convert <file> -o <out>` | Convert a response file to StationXML, RESP or SACPZ, read back and checked. |
 | `nrlx local sync\|status\|remove` | Keep a local copy of the whole NRL, for `nrlx response --source local`. |
 | `nrlx doctor <file>` | Run structural health checks on a saved response file. |
 
@@ -110,9 +111,9 @@ nrlx response --sensor streckeisen,STS-2,EG3,SG=1500 \
   -o station.xml
 ```
 
-- The format comes from the extension: `.xml` for StationXML, `.resp` for RESP;
-  `--format stationxml|resp` overrides it. The RESP writer keeps 16 significant
-  digits.
+- The format comes from the extension: `.xml` for StationXML, `.resp` for RESP,
+  `.pz` for SACPZ; `--format stationxml|resp|sacpz` overrides it. The RESP writer
+  keeps 16 significant digits.
 - `--channels` are written as given, all in one file; `--split` writes one file
   per channel, named by its SEED id (`station_XY.MYSTN.00.BHZ.xml`). A channel
   code whose band letter does not fit the sample rate (SEED norm) gets a one-line
@@ -163,6 +164,26 @@ nrlx local remove        # asks first (--yes to skip); the catalog stays
 - `--source local` builds without any request: a part alone is its file, a
   sensor and a datalogger are combined by nrlx (as with `--sensor-file`). With
   `--source service` (the default) the service combines the NRL parts.
+
+### Converting a file
+
+```bash
+nrlx convert station.dataless -o station.xml       # every channel, one file
+nrlx convert station.xml -o station.resp --split   # one file per channel
+nrlx convert "station.xml#XY.MYSTN.00.BHZ" -o bhz.pz
+```
+
+- The input is any file obspy reads: StationXML, RESP, dataless SEED, XSEED,
+  SC3ML. The output is StationXML, RESP or SACPZ, from the extension (`.xml`,
+  `.resp`, `.pz`) or `--format`.
+- The file written is read back and compared with the input. StationXML and RESP
+  must give the same curve (within 1e-9) or the command fails, keeping the file
+  to look at.
+- SACPZ keeps only the first poles and zeros stage and the overall sensitivity;
+  a note says how far that is from the whole response (an STS-2 on a Q330 at
+  40 sps: within 4.9 % up to 3.6 Hz, 28.9 % at 16 Hz). Channels SACPZ cannot hold
+  (no poles and zeros, or an input other than m, m/s or m/s**2) are refused
+  before writing, where obspy would skip them silently.
 
 ## Python library
 
@@ -230,17 +251,15 @@ importing only the ones below it:
 | --- | --- |
 | `nrlx/schema/` | msgspec structs of every input: the NRL service JSON (`catalog`, `prefixes`), the cache files, and the request `response`, with its validation |
 | `nrlx/models/` | the structs with their methods (`Catalog`, `Found`), plus `Nrlx` |
-| `nrlx/core/` | pure functions on plain values: matching, SEED band codes, `/combine` parameters, doctor checks |
-| `nrlx/io/` | the NRL service (httpx), the local cache, obspy reading and labelling, the RESP writer |
+| `nrlx/core/` | pure functions on plain values: matching, SEED band codes, `/combine` parameters, the combination of responses, the amplitudes of the stages, the conversion checks, doctor checks |
+| `nrlx/io/` | the NRL service (httpx), the local cache and the local NRL, obspy reading, labelling and writing, the RESP writer, the SACPZ reader |
 | `nrlx/tools/cmd/` | the `nrlx` commands, the only code that prints and exits |
 
 Library code raises built-in exceptions, and each command catches the ones it
 can get. [CLAUDE.md](CLAUDE.md) lists the code conventions.
 
-Deliberately out of scope for now: combining a response file you already have
-(e.g. a manufacturer RESP) with an NRL entry — nrlx is strictly "NRL in,
-NRL out." Merging and converting arbitrary response sources (dataless SEED,
-RESP, SAC PZ) is the planned response phase. Issues and PRs welcome.
+Not yet: `nrlx doctor` does not check SACPZ files, and nrlx does not read
+SACPZ as an input (obspy cannot). Issues and PRs welcome.
 
 ## Disclaimer
 
