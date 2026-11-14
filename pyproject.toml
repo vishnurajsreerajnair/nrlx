@@ -7,7 +7,7 @@ name = "nrlx"
 version = "0.2.1"
 description = "NRL eXtended: tools for building and validating seismic instrument responses."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 authors = [
   { name = "Vishnuraj Sreeraj Nair", email = "vishnurajsreeraj@yahoo.com" }
@@ -27,17 +27,19 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-    "typer>=0.12",
+    "typer>=0.19",
     "rich>=13.0",
     "platformdirs>=4.0",
     "httpx>=0.27",
+    "msgspec>=0.18",
+    "obspy>=1.4",
 ]
 
 [project.optional-dependencies]
@@ -46,35 +48,35 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.10",
 ]
-obspy = [
-    "obspy>=1.4",
-]
 plot = [
     "matplotlib>=3.8",
 ]
 
 [project.scripts]
-nrlx = "nrlx.cli:app"
+nrlx = "nrlx.tools.cmd:app"
 
 [tool.ruff]
 line-length = 88
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 strict = true
 warn_unused_ignores = true
 warn_return_any = true
 warn_unreachable = true
 
-# obspy is an optional extra without type stubs; its import lives behind the
-# lazy loader in nrlx.inventory.
+# obspy has no type stubs
 [[tool.mypy.overrides]]
 module = ["obspy", "obspy.*"]
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib"]
+testpaths = ["tests"]
 
 [project.urls]
 Homepage = "https://github.com/vishnurajsreerajnair/nrlx"

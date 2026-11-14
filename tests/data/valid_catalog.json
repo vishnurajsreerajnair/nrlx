@@ -1,0 +1,82 @@
+{
+  "NRLCatalog": {
+    "formatversion": 1.0,
+    "detail": "root detail",
+    "element": [
+      {
+        "name": "sensor",
+        "detail": "sensor detail",
+        "manufacturer": [
+          {
+            "name": "Streckeisen",
+            "detail": "streckeisen detail",
+            "model": [
+              {
+                "name": "STS-2",
+                "detail": "",
+                "configuration": [
+                  {
+                    "instconfig": "sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel",
+                    "version": "2020-01-01",
+                    "description": "Streckeisen; STS-2; gain 1500",
+                    "parameters": {"Sensitivity": "1500 V/m/s"}
+                  },
+                  {
+                    "instconfig": "sensor_Streckeisen_STS-2_EG3_SG750_LP120_STgroundVel",
+                    "version": "2020-01-01",
+                    "description": "Streckeisen; STS-2; gain 750",
+                    "parameters": {"Sensitivity": "750 V/m/s"}
+                  }
+                ]
+              },
+              {
+                "name": "STS-1",
+                "configuration": [
+                  {
+                    "instconfig": "sensor_Streckeisen_STS-1_LP360",
+                    "version": "2019-06-01"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Nanometrics",
+            "model": [
+              {
+                "name": "Trillium 120",
+                "configuration": [
+                  {
+                    "instconfig": "sensor_Nanometrics_Trillium-120_SG1200",
+                    "version": "2019-01-01"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "datalogger",
+        "manufacturer": [
+          {
+            "name": "Quanterra",
+            "model": [
+              {
+                "name": "Q330",
+                "configuration": [
+                  {
+                    "instconfig": "datalogger_Quanterra_Q330_FV40Vpp_FR100",
+                    "version": "2018-01-01",
+                    "description": "Quanterra; Q330; 40 Vpp; 100 sps",
+                    "parameters": {"Full-Scale_Voltage": "40Vpp"}
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

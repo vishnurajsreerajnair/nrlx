@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<FDSNStationXML xmlns="http://www.fdsn.org/xml/station/1">
+  <Network code="XX">
+    <Station code="YY">
+      <Channel code="ZZZ" locationCode="00">
+        <Response>
+          <InstrumentSensitivity><Value>1.0</Value></InstrumentSensitivity>
+        </Response>
+      </Channel>
+    </Station>
+  </Network>
+</FDSNStationXML>

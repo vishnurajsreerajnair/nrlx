@@ -1,5 +1,88 @@
 # Changelog
 
+## [Unreleased]
+
+The package is restructured in layers, as in isamgeo-seismic-tools: `schema`
+(msgspec structs of every input), `models` (the structs with their methods), `core`
+(pure functions), `io` (service, cache, obspy) and `tools/cmd` (the commands, the
+only place that prints and exits). The CLI flags are unchanged; the Python API
+changes as listed below.
+
+### Added
+
+- msgspec structs of the NRL service JSON: `schema.catalog` (the `/catalog` tree),
+  `schema.cache.CatalogFileInput` (the catalog file) and `schema.prefixes` (the
+  `/prefix-lookup` table). The catalog is decoded and validated in one step, and
+  the structs accept unknown fields, so a field added by the service does not
+  break nrlx.
+- `schema.instrument.InstrumentInput` and `models.instrument.Instrument`, the
+  selection of a sensor or datalogger (exact instconfig, or manufacturer, model and
+  keys), and `schema.build.BuildInput` and `models.build.Build`, the request of
+  `nrlx build`. The rules of a request are checked once, in the structs: an
+  instconfig with filters, repeated channels, merging fewer than two channels or
+  a format other than uncompressed StationXML.
+- `nrlx -j`/`--version`, as in the other ISAMGEO tools.
+- `nrlx status --live` shows the service version, from the `/version` endpoint
+  (a few bytes, where the old check downloaded the whole catalog).
+- `nrlx build` prints the resolved instconfig, to pin it with
+  `--sensor-instconfig`/`--datalogger-instconfig`; `nrlx sync` prints the number
+  of configurations.
+- Tests split in `tests/lib` and `tests/entrypoints`, with the shared data in
+  `tests/data` and a fake NRL service in `tests/conftest.py`. New tests for the
+  obspy conversions and the StationXML merge, for the catalog validation and for
+  the request rules. CI runs `ruff format --check` and Python 3.11 to 3.14.
+- Coordinates of the station: `nrlx build --latitude --longitude` (with
+  `--elevation` and `--depth` in metres, 0 by default) and the same fields of
+  `BuildInput`. They are written on the station and on every channel of each
+  StationXML (`io.inventory.set_coordinates`), merged or one per channel, instead
+  of the service placeholders; they need the stationxml format, not zipped.
+
+### Changed
+
+- **obspy and msgspec are required**, and Python 3.11 or later: the `nrlx[obspy]`
+  extra and the lazy obspy import are removed.
+- **The custom exceptions are removed** (`nrlx.exceptions`): nrlx raises
+  built-in exceptions, caught in the commands. A missing catalog is a
+  `FileNotFoundError`, an invalid catalog or request a `ValueError`, a selection
+  matching no configuration or several a `LookupError`, a service error an
+  `httpx.HTTPError`, a file error an `OSError`.
+- Modules moved: `nrlx.nrl.Nrlx` to `nrlx.models.nrlx`, `BuiltResponse` to
+  `nrlx.models.response`, `Catalog` to `nrlx.models.catalog`, the HTTP client to
+  `nrlx.io.service` (functions `get_url` and `get` instead of `NRLClient`), the
+  cache to `nrlx.io.cache`, the obspy conversions to `nrlx.io.inventory`, the
+  doctor checks to `nrlx.core.doctor` and the CLI to `nrlx.tools.cmd` (the
+  `nrlx` entry point is `nrlx.tools.cmd:app`). `from nrlx import Nrlx,
+  BuiltResponse, Catalog, ResponseFormat` keeps working.
+- `ResponseFormat` is a `Literal["resp", "stationxml", "stationxml-resp"]`
+  instead of an enum: pass `format="resp"` instead of `ResponseFormat.RESP`.
+- `Catalog` is the decoded JSON tree: `get_elements`, `get_manufacturers`,
+  `get_models` and `get_configurations` return the nodes with their parents, for
+  example `(element, manufacturer, model, configuration)`, and `resolve` returns
+  the single matching configuration. `Catalog.search(query)` is
+  `get_configurations(keys=[query])`, `Catalog.configuration(instconfig)` and the
+  count properties are removed, `format_version` is a number (1.0), as in the
+  service JSON.
+- `Nrlx.resolve`, `resolve_sensor` and `resolve_datalogger` are
+  `Nrlx.catalog.resolve("sensor", ...)`; `Nrlx` holds `catalog`, `base_url` and
+  `timeout` instead of an `NRLClient`.
+- The doctor checks are functions, `check_response(content, format)` returning
+  `(severity, message)` pairs, instead of `HealthReport.from_file`.
+- `nrlx build` rejects `--sensor-instconfig` together with
+  `--sensor-manufacturer`/`--sensor-model`/`--sensor-keys` (the filters were
+  ignored), and the same for the datalogger.
+- The errors are printed on stderr.
+
+### Fixed
+
+- `nrlx sync` and `Nrlx.sync` validate the download before writing it: an error
+  page or a broken catalog no longer replaces the previous catalog in the cache.
+- The merged StationXML of `nrlx build --merge-channels` records the instconfig of
+  the sensor and datalogger, not only the sensor one.
+- Repeated channels in `nrlx build` are rejected, instead of writing the same file
+  twice.
+- File paths and catalog texts with square brackets are no longer read as Rich
+  markup in the output.
+
 ## [0.2.1] - 2026-09-27
 
 ### Fixed

@@ -46,8 +46,8 @@ Full command reference and the ifs-and-buts (dataloggers, multiple channels, out
 pip install nrlx
 ```
 
-Add `nrlx[obspy]` if you also want `obspy` available for downstream parsing of the
-responses `nrlx` builds — `nrlx` itself never requires it.
+nrlx needs Python 3.11 or later, and installs `obspy` with it: the responses it
+builds convert to obspy objects in memory (see [Python library](#python-library)).
 
 ## Concepts
 
@@ -130,8 +130,7 @@ LP = Long-Period Corner, FR = Final Sample Rate, FV = Full-Scale Voltage.
 
 `--channels` takes comma-separated channel codes. Several channels write one
 file per channel (`station_EHZ.xml`, `station_EHN.xml`, ...); add `--merge-channels` to
-get one StationXML inventory containing all of them (needs
-`pip install 'nrlx[obspy]'`):
+get one StationXML inventory containing all of them:
 
 ```bash
 nrlx build \
@@ -140,20 +139,40 @@ nrlx build \
   --channels EHZ,EHN,EHE --merge-channels --output station.xml
 ```
 
+### Coordinates
+
+The service leaves placeholders for the place of the station. `--latitude` and
+`--longitude` (degrees) write the real place on the station and on every
+channel; `--elevation` (metres) and `--depth` (metres below the surface, for a
+borehole sensor) are 0 unless given. They need the StationXML format, not zipped:
+
+```bash
+nrlx build \
+  --sensor-keys streckeisen,STS-2,EG3,SG1500 \
+  --network XY --station MYSTN \
+  --channels EHZ,EHN,EHE --merge-channels \
+  --latitude 49.096 --longitude 8.432 --elevation 112 --output station.xml
+```
+
 ## Python library
 
 Everything the CLI does is a thin layer over the `nrlx` package:
 
 ```python
-from nrlx import Nrlx, ResponseFormat
+from nrlx import Nrlx
 
 nrl = Nrlx.from_cache()                      # loads the catalog already on disk
 # nrl = Nrlx.sync()                          # or download a fresh one first
 #                                            # (first run / to refresh)
 
-# Find and browse
-nrl.catalog.search("lunitek")                # free-text across the catalog
-nrl.catalog.configurations(element="sensor", manufacturer="Streckeisen")
+# Find and browse: each row carries its parents
+for element, manufacturer, model, configuration in nrl.catalog.get_configurations(
+    "sensor", "Streckeisen", keys=["groundVel"]
+):
+    print(model.name, configuration.instconfig, configuration.parameters)
+
+nrl.catalog.get_configurations(keys=["lunitek"])   # free-text across the catalog
+nrl.catalog.resolve("sensor", keys=["STS-2", "SG1500", "EG3"])  # exactly one, or LookupError
 
 # Combine sensor + datalogger, entirely in memory (nothing written to disk)
 built = nrl.combine(
@@ -177,7 +196,11 @@ built = nrl.combine(
 ```
 
 Passing both `sensor_keys` and `sensor_instconfig` for the same element is an
-error (same for the datalogger) - give exactly one.
+error (same for the datalogger) - give exactly one. nrlx raises built-in
+exceptions: `LookupError` when keys match no configuration or several (the
+message lists the candidates), `ValueError` for an invalid request or catalog,
+`FileNotFoundError` when the catalog has not been synced, and `httpx.HTTPError`
+when the service cannot be reached.
 
 `combine()` also takes the StationXML identity and validity fields — pass them
 and IRIS stamps them into the response instead of placeholders:
@@ -194,7 +217,7 @@ All six are optional; omit them and the service fills in placeholders. If you'd
 rather not commit to StationXML naming at all, skip them and take the bare
 `Response` instead (below).
 
-With the `nrlx[obspy]` extra installed, a `BuiltResponse` converts in memory —
+A StationXML `BuiltResponse` converts to obspy in memory —
 this is the NRL-v1-style workflow, and the way around StationXML's strict
 network/station/channel naming: take the bare `Response` and attach it to
 channels you build yourself, with whatever codes you need.
@@ -212,25 +235,35 @@ channel = Channel(code="HHZ", location_code="00",
 
 ## Status
 
-v0.1.0 - the first release, working end to end against the live NRL v2 service:
-catalog browsing, key/instconfig selection, sensor+datalogger combination,
-multi-channel builds with optional merging, in-memory obspy conversion, and the
-structural `doctor` check. Planned next: response format merging and conversion
-(dataless SEED, RESP, SAC PZ), a suggestion engine, a TUI, a web interface, and
-local sensor-asset management. See [CHANGELOG.md](CHANGELOG.md) for details.
+Working end to end against the live NRL v2 service (released 0.2.x on PyPI; 0.1.0
+was an early skeleton, yanked): catalog browsing, key/instconfig selection,
+sensor+datalogger combination, multi-channel builds with optional merging,
+in-memory obspy conversion, and the structural `doctor` check. Planned next:
+response format merging and conversion (dataless SEED, RESP, SAC PZ), a suggestion
+engine, a TUI, a web interface, and local sensor-asset management. See
+[CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Note for developers
 
-This is pre-1.0 and the public API (both CLI flags and the Python classes in
-`nrlx.catalog`/`nrlx.nrl`) can still change between releases. The code favors small,
-immutable dataclasses with explicit constructors (`Catalog.from_file`,
-`Nrlx.from_cache`) over free functions passing raw dicts around — if you're
-extending it, follow that pattern rather than introducing a parallel one.
+This is pre-1.0 and the public API (both CLI flags and the Python classes) can
+still change between releases. The package is organized in layers, each
+importing only the ones below it:
+
+| Layer | Holds |
+| --- | --- |
+| `nrlx/schema/` | msgspec structs of every input: the NRL service JSON (`catalog`, `prefixes`), the cache files, and the requests (`instrument`, `build`), with their validation |
+| `nrlx/models/` | the structs with their methods (`Catalog`, `Instrument`, `Build`), plus `Nrlx` and `BuiltResponse` |
+| `nrlx/core/` | pure functions on plain values: matching, `/combine` parameters, doctor checks |
+| `nrlx/io/` | the NRL service (httpx), the local cache, obspy reading and merging |
+| `nrlx/tools/cmd/` | the `nrlx` commands, the only code that prints and exits |
+
+Library code raises built-in exceptions, and each command catches the ones it
+can get. [CLAUDE.md](CLAUDE.md) lists the code conventions.
 
 Deliberately out of scope for now: combining a response file you already have
-(e.g. a manufacturer RESP) with an NRL entry — nrlx v0.1 is strictly "NRL in,
+(e.g. a manufacturer RESP) with an NRL entry — nrlx is strictly "NRL in,
 NRL out." Merging and converting arbitrary response sources (dataless SEED,
-RESP, SAC PZ) is the planned `nrlx.response` phase. Issues and PRs welcome.
+RESP, SAC PZ) is the planned response phase. Issues and PRs welcome.
 
 ## Disclaimer
 
