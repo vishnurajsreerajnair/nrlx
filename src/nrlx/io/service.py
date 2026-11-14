@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from urllib.parse import urljoin
 
 import httpx
@@ -66,3 +67,46 @@ def get(
     response.raise_for_status()
 
     return response.content
+
+
+def download(
+    base_url: str,
+    path: str,
+    params: dict[str, str | int] | None,
+    target: Path,
+    timeout: float = DEFAULT_TIMEOUT,
+) -> Path:
+    """Content of a GET request to an endpoint, written to a file as it arrives
+
+    For the large answers (the whole NRL is 300 MB), which get would hold in memory.
+
+    Args:
+        base_url: base URL of the service.
+        path: endpoint, for example combine.
+        params: query parameters, None for no parameters.
+        target: file to write, replaced if it exists.
+        timeout: timeout of each step of the request in seconds.
+
+    Returns:
+        the file written.
+
+    Raises:
+        httpx.HTTPError: if the service cannot be reached or answers with an error
+            status.
+        OSError: if the file cannot be written.
+
+
+    """
+    with httpx.stream(
+        "GET",
+        get_url(base_url, path),
+        params=params,
+        timeout=timeout,
+        follow_redirects=True,
+    ) as response:
+        response.raise_for_status()
+        with target.open("wb") as file:
+            for chunk in response.iter_bytes():
+                file.write(chunk)
+
+    return target

@@ -8,6 +8,7 @@ import pytest
 from obspy import UTCDateTime
 
 from nrlx.io.cache import get_catalog_file, get_prefixes_file
+from nrlx.io.local import FULL_NRL_PARAMS, get_tree_dir
 from nrlx.models.nrlx import Nrlx
 
 DATA_DIR = Path(__file__).parents[2] / "data"
@@ -179,3 +180,107 @@ def test_response_of_two_file_parts_asks_nothing(nrl, fake_service):
 
     assert fake_service.requests == []
     assert inventory[0][0][0].code == "ZZZ"
+
+
+# the local copy
+def test_sync_local_installs_the_tree_and_notes_the_missing_files(
+    tmp_path, fake_service, catalog_content, prefixes_content, nrl_zip
+):
+    fake_service.contents["catalog"] = catalog_content
+    fake_service.contents["prefix-lookup"] = prefixes_content
+    fake_service.contents["combine"] = nrl_zip
+
+    nrl, notes = Nrlx.sync_local(tmp_path)
+
+    tree = get_tree_dir(tmp_path)
+    assert nrl.local_tree == tree
+    assert (tree / "index.txt").is_file()
+    assert get_catalog_file(tmp_path).read_bytes() == catalog_content
+    assert fake_service.requests[2].params == FULL_NRL_PARAMS
+    # the catalog has five configurations, the zip two
+    assert len(notes) == 3
+    assert "no file in the NRL zip: sensor_Streckeisen_STS-1_LP360" in notes
+    assert sorted(path.name for path in tree.parent.iterdir()) == [
+        "NRL",
+        "catalog.json",
+        "prefixes.json",
+    ]
+    assert Nrlx.from_cache(tmp_path).local_tree == tree
+
+
+def test_sync_local_failure_keeps_the_previous_copy(
+    cache_root, fake_service, catalog_content, prefixes_content
+):
+    tree = get_tree_dir(cache_root)
+    (tree / "sensor").mkdir(parents=True)
+    fake_service.contents["catalog"] = catalog_content.replace(b"STS-1", b"STS-9")
+    fake_service.contents["prefix-lookup"] = prefixes_content
+    fake_service.contents["combine"] = b"<html>maintenance</html>"
+
+    with pytest.raises(ValueError, match="is not a zip"):
+        Nrlx.sync_local(cache_root)
+
+    # the copy, the catalog and nothing staged
+    assert (tree / "sensor").is_dir()
+    assert get_catalog_file(cache_root).read_bytes() == catalog_content
+    assert sorted(path.name for path in tree.parent.iterdir()) == [
+        "NRL",
+        "catalog.json",
+        "prefixes.json",
+    ]
+
+
+def test_response_from_the_local_copy_combines_without_requests(
+    catalog, prefixes, local_tree, fake_service
+):
+    nrl = Nrlx(catalog=catalog, prefixes=prefixes, local_tree=local_tree)
+
+    inventory, notes = nrl.response(
+        sensor=["STS-2", "SG=1500"],
+        datalogger=["Q330"],
+        source="local",
+        channels=["HHZ"],
+    )
+
+    assert fake_service.requests == []
+    channel = inventory[0][0][0]
+    assert channel.code == "HHZ"
+    assert channel.sample_rate == pytest.approx(40.0)
+    assert channel.response.instrument_sensitivity.input_units.upper() == "M/S"
+    assert notes == []
+
+
+def test_response_of_a_part_alone_from_the_local_copy_is_its_file(
+    catalog, prefixes, local_tree, fake_service
+):
+    nrl = Nrlx(catalog=catalog, prefixes=prefixes, local_tree=local_tree)
+    expected = obspy.read_inventory(DATA_DIR / "nrl_part_sts2.xml")[0][0][0]
+
+    inventory, notes = nrl.response(sensor=["STS-2", "SG=1500"], source="local")
+
+    assert fake_service.requests == []
+    assert notes == []
+    assert inventory[0][0][0].response == expected.response
+
+
+def test_response_from_a_file_and_the_local_copy(
+    catalog, prefixes, local_tree, fake_service
+):
+    nrl = Nrlx(catalog=catalog, prefixes=prefixes, local_tree=local_tree)
+    sensor = obspy.read_inventory(DATA_DIR / "nrl_part_ea120.xml")[0][0][0].response
+
+    _, notes = nrl.response(sensor_response=sensor, datalogger=["Q330"], source="local")
+
+    assert fake_service.requests == []
+    assert [note.split(":")[0] for note in notes] == ["stage 1"]
+
+
+def test_response_from_a_missing_local_copy(nrl, catalog, prefixes, tmp_path):
+    with pytest.raises(FileNotFoundError, match="run 'nrlx local sync'"):
+        nrl.response(sensor=["STS-1"], source="local")
+
+    # a copy synced before the catalog had the part
+    (tmp_path / "NRL").mkdir()
+    synced = Nrlx(catalog=catalog, prefixes=prefixes, local_tree=tmp_path / "NRL")
+    with pytest.raises(FileNotFoundError, match="STS-1_LP360 is not in the local"):
+        synced.response(sensor=["STS-1"], source="local")

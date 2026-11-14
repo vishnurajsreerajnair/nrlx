@@ -25,7 +25,7 @@ from nrlx.io.service import DEFAULT_BASE_URL
 from nrlx.models.catalog import Found
 from nrlx.models.nrlx import Nrlx
 from nrlx.schema.prefixes import PrefixInput
-from nrlx.schema.response import ResponseInput
+from nrlx.schema.response import ResponseInput, Source
 
 console = Console()
 errconsole = Console(stderr=True)
@@ -147,6 +147,13 @@ def response(
             "--interactive", "-i", help="Choose the parts and labels step by step."
         ),
     ] = False,
+    source: Annotated[
+        Source,
+        typer.Option(
+            "--source",
+            help="Where the NRL parts come from: service, or local (nrlx local sync).",
+        ),
+    ] = "service",
     cache_root: Annotated[
         Path | None,
         typer.Option("--cache-root", help="Custom cache root directory."),
@@ -216,7 +223,7 @@ def response(
     if interactive:
         selections, network, station, location, codes, output = ask(nrl)
         line = command_line(
-            selections, files, network, station, location, codes, output
+            selections, files, source, network, station, location, codes, output
         )
         console.print(
             f"\nThe same from the command line:\n{escape(line)}\n", soft_wrap=True
@@ -259,6 +266,7 @@ def response(
                 longitude=longitude,
                 elevation=elevation,
                 depth=depth,
+                source=source,
             )
         except ValueError as err:
             errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
@@ -317,7 +325,9 @@ def response(
             exact: list[tuple[str, list[str] | None]] = [
                 (part, [instconfig]) for part, instconfig in unique
             ]
-            line = command_line(exact, files, network, station, location, codes, None)
+            line = command_line(
+                exact, files, source, network, station, location, codes, None
+            )
             console.print(
                 f"\nEvery part matches one configuration. Add -o FILE to write:\n"
                 f"{escape(line)} -o FILE",
@@ -329,6 +339,7 @@ def response(
                 given,
                 sensor_response,
                 datalogger_response,
+                source,
                 network,
                 station,
                 location,
@@ -350,6 +361,7 @@ def write(
     given: list[tuple[str, list[str]]],
     sensor_response: Response | None,
     datalogger_response: Response | None,
+    source: Source,
     network: str | None,
     station: str | None,
     location: str | None,
@@ -372,6 +384,7 @@ def write(
         sensor_response: response of the sensor from a file, None for its keys.
         datalogger_response: response of the datalogger from a file, None for its
             keys.
+        source: where the NRL parts come from, service or local.
         network: network code, None for the placeholder.
         station: station code, None for the placeholder.
         location: location code, None for the placeholder.
@@ -414,6 +427,7 @@ def write(
             datalogger=parts.get("datalogger"),
             sensor_response=sensor_response,
             datalogger_response=datalogger_response,
+            source=source,
             integrated=parts.get("integrated"),
             soh=parts.get("soh"),
             network=network,
@@ -433,7 +447,7 @@ def write(
             f"({escape(nrl.base_url)}). {escape(str(err))}"
         )
         raise typer.Exit(code=1) from err
-    except (LookupError, ValueError) as err:
+    except (LookupError, ValueError, OSError) as err:
         errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
         raise typer.Exit(code=1) from err
 
@@ -689,6 +703,7 @@ def split_keys(values: list[str] | None) -> list[str] | None:
 def command_line(
     selections: list[tuple[str, list[str] | None]],
     files: list[tuple[str, str]],
+    source: Source,
     network: str | None,
     station: str | None,
     location: str | None,
@@ -701,6 +716,7 @@ def command_line(
         selections: each part and its keys, None when not given.
         files: each part from a file and its option value, FILE or
             FILE#NET.STA.LOC.CHA.
+        source: where the NRL parts come from, written only when local.
         network: network code, None when not given.
         station: station code, None when not given.
         location: location code, None when not given.
@@ -720,6 +736,7 @@ def command_line(
         for word in [f"--{part}", ",".join(partkeys)]
     ]
     words += [word for part, value in files for word in [f"--{part}-file", value]]
+    words += ["--source", source] if source != "service" else []
     words += [
         word
         for option, value in [

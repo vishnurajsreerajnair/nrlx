@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -28,13 +29,23 @@ from nrlx.io.cache import (
 from nrlx.io.inventory import (
     label_channels,
     placeholder_inventory,
+    read_part,
     read_stationxml,
     set_coordinates,
 )
-from nrlx.io.service import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, get
+from nrlx.io.local import (
+    DOWNLOAD_TIMEOUT,
+    FULL_NRL_PARAMS,
+    extract_tree,
+    get_part_file,
+    get_tree_dir,
+    install_tree,
+    missing_parts,
+)
+from nrlx.io.service import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, download, get
 from nrlx.models.catalog import Catalog, Found
 from nrlx.schema.prefixes import PrefixInput
-from nrlx.schema.response import ResponseInput
+from nrlx.schema.response import ResponseInput, Source
 
 
 class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
@@ -46,6 +57,7 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             parameters (FR=40). Empty when not loaded.
         base_url: base URL of the NRL service.
         timeout: timeout of the requests in seconds.
+        local_tree: folder of the local copy of the NRL, None without one.
 
 
     """
@@ -54,6 +66,7 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
     prefixes: list[PrefixInput] = []
     base_url: str = DEFAULT_BASE_URL
     timeout: float = DEFAULT_TIMEOUT
+    local_tree: Path | None = None
 
     @classmethod
     def from_cache(
@@ -70,7 +83,8 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             base_url: base URL of the NRL service.
 
         Returns:
-            Nrlx with the catalog and the code table of the cache.
+            Nrlx with the catalog and the code table of the cache, and the local
+            copy of the NRL when it has been synced.
 
         Raises:
             FileNotFoundError: if the catalog or the code table has not been synced
@@ -82,7 +96,13 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
         """
         catalog = read_catalog(get_catalog_file(cache_root))
         prefixes = read_prefixes(get_prefixes_file(cache_root))
-        nrl = cls(catalog=catalog, prefixes=prefixes, base_url=base_url)
+        tree = get_tree_dir(cache_root)
+        nrl = cls(
+            catalog=catalog,
+            prefixes=prefixes,
+            base_url=base_url,
+            local_tree=tree if tree.is_dir() else None,
+        )
 
         return nrl
 
@@ -132,9 +152,93 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
         write_catalog(catalogcontent, get_catalog_file(cache_root))
         write_prefixes(prefixescontent, get_prefixes_file(cache_root))
 
-        nrl = cls(catalog=catalog, prefixes=prefixes, base_url=base_url)
+        tree = get_tree_dir(cache_root)
+        nrl = cls(
+            catalog=catalog,
+            prefixes=prefixes,
+            base_url=base_url,
+            local_tree=tree if tree.is_dir() else None,
+        )
 
         return nrl
+
+    @classmethod
+    def sync_local(
+        cls,
+        cache_root: Path | None = None,
+        *,
+        base_url: str = DEFAULT_BASE_URL,
+    ) -> tuple[Nrlx, list[str]]:
+        """Download the whole NRL with the catalog and the code table, as the local
+        copy
+
+        The zip (about 300 MB) is unzipped beside the copy and checked against the
+        catalog; then the tree, the catalog and the code table replace the
+        previous ones together, and the zip is deleted. A failure before keeps the
+        previous copy whole.
+
+        Args:
+            cache_root: custom root folder of the cache, None for the platform cache
+                folder of the user.
+            base_url: base URL of the NRL service.
+
+        Returns:
+            Nrlx with the local copy, and the notes on the configurations of the
+            catalog without a file in the zip.
+
+        Raises:
+            httpx.HTTPError: if the service cannot be reached or answers with an
+                error status.
+            ValueError: if a download is not a valid catalog, code table or NRL
+                zip.
+            OSError: if the files cannot be written.
+
+
+        """
+        catalogcontent = get(base_url, "catalog")
+        prefixescontent = get(
+            base_url, "prefix-lookup", {"format": "json", "nodata": 404}
+        )
+        try:
+            catalog = decode_catalog(catalogcontent)
+        except msgspec.DecodeError as err:
+            raise ValueError(f"Invalid catalog from {base_url}. {err}") from err
+        try:
+            prefixes = decode_prefixes(prefixescontent)
+        except msgspec.DecodeError as err:
+            raise ValueError(f"Invalid code table from {base_url}. {err}") from err
+
+        # the zip and the new tree beside the copy, removed whatever happens
+        tree = get_tree_dir(cache_root)
+        tree.parent.mkdir(parents=True, exist_ok=True)
+        zip_file = tree.with_name(f"{tree.name}.zip")
+        staged = tree.with_name(f"{tree.name}.new")
+        try:
+            if staged.exists():
+                shutil.rmtree(staged)
+            download(base_url, "combine", FULL_NRL_PARAMS, zip_file, DOWNLOAD_TIMEOUT)
+            extract_tree(zip_file, staged)
+            instconfigs = [
+                configuration.instconfig
+                for *_, configuration in catalog.get_configurations()
+            ]
+            missing = missing_parts(staged, instconfigs)
+
+            # the three together
+            install_tree(staged, tree)
+            write_catalog(catalogcontent, get_catalog_file(cache_root))
+            write_prefixes(prefixescontent, get_prefixes_file(cache_root))
+        finally:
+            zip_file.unlink(missing_ok=True)
+            if staged.exists():
+                shutil.rmtree(staged)
+
+        notes = [f"no file in the NRL zip: {instconfig}" for instconfig in missing]
+        nrl = cls(
+            catalog=catalog, prefixes=prefixes, base_url=base_url, local_tree=tree
+        )
+
+        return nrl, notes
 
     def find(self, keys: list[str], element: str | None = None) -> Found:
         """Configurations matched by keys, see Catalog.find
@@ -164,6 +268,7 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
         datalogger: list[str] | None = None,
         sensor_response: Response | None = None,
         datalogger_response: Response | None = None,
+        source: Source = "service",
         integrated: list[str] | None = None,
         soh: list[str] | None = None,
         network: str | None = None,
@@ -182,9 +287,11 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
         Each part is resolved in the catalog before the request, so that a part
         matching no configuration or several fails without network. With NRL parts
         only, the service builds the response; with a response from a file, the NRL
-        part is asked alone and nrlx combines the two (see combine_responses). Each
-        channel code is a copy of the response, and the labels and the place are
-        set on them. See ResponseInput for the arguments.
+        part is asked alone and nrlx combines the two (see combine_responses).
+        From the local copy, a part alone is its file and two parts are combined
+        by nrlx, without any request. Each channel code is a copy of the response,
+        and the labels and the place are set on them. See ResponseInput for the
+        arguments.
 
         Args:
             sensor: keys of the sensor, None without a sensor.
@@ -193,6 +300,7 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
                 place of its keys, None to select it by keys.
             datalogger_response: response of the datalogger (or of a whole
                 channel) in place of its keys, None to select it by keys.
+            source: where the NRL parts come from, "service" or "local".
             integrated: keys of the integrated instrument, None without one.
             soh: keys of the state of health channel, None without one.
             network: network code, None for the service placeholder.
@@ -218,6 +326,8 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             ValueError: if the request is invalid (see ResponseInput), a condition
                 name stands for several parameters, or the parts do not combine.
             LookupError: if a part matches no configuration, or more than one.
+            FileNotFoundError: if the local copy, or the file of a part in it, is
+                missing.
             httpx.HTTPError: if the service cannot be reached or answers with an
                 error status.
 
@@ -240,6 +350,7 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             longitude=longitude,
             elevation=elevation,
             depth=depth,
+            source=source,
         )
 
         # the exact instconfigs, in the order of the signal, before any request
@@ -254,28 +365,35 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             if keys is not None
         ]
         notes: list[str] = list()
-        if request.sensor_response is None and request.datalogger_response is None:
-            # NRL parts only: the service combines them
-            params = combine_params(cascade_instconfig(instconfigs))
-            content = get(self.base_url, "combine", params, self.timeout)
-            built = read_stationxml(content)
-        else:
-            # the NRL part alone from the service (its instconfig is the only one),
-            # then combined by nrlx
-            sensor_part = (
-                request.sensor_response
-                if request.sensor_response is not None
-                else self.part(instconfigs[0])
-            )
-            datalogger_part = (
-                request.datalogger_response
-                if request.datalogger_response is not None
-                else self.part(instconfigs[0])
-            )
-            combined, notes = combine_responses(sensor_part, datalogger_part)
-            built = placeholder_inventory(
-                combined, output_rate(combined.response_stages)
-            )
+        files = request.sensor_response is not None or (
+            request.datalogger_response is not None
+        )
+        match (request.source, files, instconfigs):
+            case ("service", False, _):
+                # NRL parts only: the service combines them
+                params = combine_params(cascade_instconfig(instconfigs))
+                content = get(self.base_url, "combine", params, self.timeout)
+                built = read_stationxml(content)
+            case ("local", False, [instconfig]):
+                # a part alone: its file, as the service gives it
+                built = read_stationxml(self.local_file(instconfig).read_bytes())
+            case _:
+                # a sensor and a datalogger combined by nrlx: the sensor is the
+                # first instconfig, the datalogger the last
+                sensor_part = (
+                    request.sensor_response
+                    if request.sensor_response is not None
+                    else self.part(instconfigs[0], request.source)
+                )
+                datalogger_part = (
+                    request.datalogger_response
+                    if request.datalogger_response is not None
+                    else self.part(instconfigs[-1], request.source)
+                )
+                combined, notes = combine_responses(sensor_part, datalogger_part)
+                built = placeholder_inventory(
+                    combined, output_rate(combined.response_stages)
+                )
 
         # a channel for each code, labelled, then placed
         inventory = label_channels(
@@ -298,23 +416,55 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
 
         return inventory, notes
 
-    def part(self, instconfig: str) -> Response:
-        """Response of a single part of the NRL, from the service
+    def part(self, instconfig: str, source: Source = "service") -> Response:
+        """Response of a single part of the NRL, from the service or the local copy
 
         Args:
             instconfig: exact instconfig of the part.
+            source: "service" or "local".
 
         Returns:
-            the response of the channel the service answers.
+            the response of its channel.
 
         Raises:
+            FileNotFoundError: if the local copy, or the file of the part in it, is
+                missing.
             httpx.HTTPError: if the service cannot be reached or answers with an
                 error status.
 
 
         """
-        params = combine_params(cascade_instconfig([instconfig]))
-        content = get(self.base_url, "combine", params, self.timeout)
-        response = read_stationxml(content)[0][0][0].response
+        match source:
+            case "local":
+                response = read_part(self.local_file(instconfig))
+            case _:
+                params = combine_params(cascade_instconfig([instconfig]))
+                content = get(self.base_url, "combine", params, self.timeout)
+                response = read_stationxml(content)[0][0][0].response
 
         return response
+
+    def local_file(self, instconfig: str) -> Path:
+        """File of a part in the local copy
+
+        Args:
+            instconfig: exact instconfig of the part.
+
+        Returns:
+            path of its file.
+
+        Raises:
+            FileNotFoundError: if there is no local copy, or the part has no file
+                in it (synced before the catalog had the part).
+
+
+        """
+        if self.local_tree is None:
+            raise FileNotFoundError("No local NRL copy: run 'nrlx local sync'.")
+        part_file = get_part_file(self.local_tree, instconfig)
+        if not part_file.is_file():
+            raise FileNotFoundError(
+                f"{instconfig} is not in the local NRL copy: run 'nrlx local sync'."
+            )
+
+        return part_file

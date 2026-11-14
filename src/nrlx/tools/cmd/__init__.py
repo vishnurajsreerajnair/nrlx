@@ -9,6 +9,7 @@ import typer
 import nrlx
 from nrlx.tools.cmd.catalog import prefixes, status, sync
 from nrlx.tools.cmd.doctor import doctor
+from nrlx.tools.cmd.local import local_app
 from nrlx.tools.cmd.response import response
 
 app = typer.Typer(
@@ -47,3 +48,4 @@ app.command()(sync)
 app.command()(prefixes)
 app.command()(response)
 app.command()(doctor)
+app.add_typer(local_app, name="local")

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import io
-from collections.abc import Callable
+import zipfile
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -48,6 +49,17 @@ class FakeAnswer:
                 response=httpx.Response(self.status_code, request=request),
             )
 
+    def iter_bytes(self) -> Iterator[bytes]:
+        # the content in two chunks, as a stream
+        middle = len(self.content) // 2
+        yield from [self.content[:middle], self.content[middle:]]
+
+    def __enter__(self) -> FakeAnswer:
+        return self
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        return None
+
 
 @dataclass
 class FakeService:
@@ -76,12 +88,25 @@ class FakeService:
 
         return answer
 
+    def stream(
+        self,
+        method: str,
+        url: str,
+        params: dict[str, str | int] | None = None,
+        timeout: float | None = None,
+        follow_redirects: bool = False,
+    ) -> FakeAnswer:
+        answer = self.get(url, params, timeout, follow_redirects)
+
+        return answer
+
 
 @pytest.fixture
 def fake_service(monkeypatch) -> FakeService:
-    """Fake NRL service in place of httpx.get"""
+    """Fake NRL service in place of httpx.get and httpx.stream"""
     service = FakeService()
     monkeypatch.setattr("nrlx.io.service.httpx.get", service.get)
+    monkeypatch.setattr("nrlx.io.service.httpx.stream", service.stream)
 
     return service
 
@@ -177,3 +202,39 @@ def make_stationxml() -> Callable[[str], bytes]:
         return buffer.getvalue()
 
     return make
+
+
+# local copy of the NRL
+NRL_FILES = {
+    "NRL/index.txt": b"index",
+    "NRL/sensor/Streckeisen/STS-2_EG3_SG1500_LP120_STgroundVel.xml": (
+        DATA_DIR / "nrl_part_sts2.xml"
+    ).read_bytes(),
+    "NRL/datalogger/Quanterra/Q330_FV40Vpp_FR100.xml": (
+        DATA_DIR / "nrl_part_q330hr.xml"
+    ).read_bytes(),
+}
+
+
+@pytest.fixture
+def nrl_zip() -> bytes:
+    """Zip of the service with two of the five configurations of the catalog: the
+    STS-2 SG1500 (an STS-2 part) and the Q330 (a Q330HR part), and an index"""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, content in NRL_FILES.items():
+            archive.writestr(name, content)
+
+    return buffer.getvalue()
+
+
+@pytest.fixture
+def local_tree(tmp_path) -> Path:
+    """Local copy with the files of nrl_zip"""
+    tree = tmp_path / "NRL"
+    for name, content in NRL_FILES.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
+    return tree

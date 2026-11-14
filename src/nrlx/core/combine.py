@@ -31,6 +31,9 @@ NORMALIZATION_NOTED = 1e-3
 # the sensitivity frequency stays at most this fraction of the output rate
 MAX_RATE_FRACTION = 0.1
 
+# below this fraction of its gain, the sensor is out of its flat band
+FLAT_BAND_FRACTION = 0.5
+
 
 def cascade_instconfig(instconfigs: list[str]) -> str:
     """instconfig of a response: the instconfigs of its parts, cascaded
@@ -277,16 +280,18 @@ def output_rate(stages: list[ResponseStage]) -> float | None:
 
 
 def sensitivity_frequency(
-    stages: list[ResponseStage], rate: float | None
+    stages: list[ResponseStage], sensor: list[ResponseStage], rate: float | None
 ) -> tuple[float, list[str]]:
     """Frequency of the overall sensitivity: the sensor's, capped by the output rate
 
     Args:
         stages: the combined stages, the sensor first.
+        sensor: the stages of the sensor, normalized.
         rate: output rate, None without digital stages.
 
     Returns:
-        the frequency in Hz, and a note when the cap applies.
+        the frequency in Hz, and the notes when the cap applies: the cap, and the
+        sensor out of its flat band at the capped frequency.
 
 
     """
@@ -308,6 +313,17 @@ def sensitivity_frequency(
             f"sensitivity at {capped:g} Hz, a tenth of the {rate:g} sps output, "
             f"instead of the sensor's {frequency:g} Hz"
         )
+
+        # the channel may see none of the sensor's flat band (a geophone on a slow
+        # channel): any frequency it records is in the roll-off
+        fraction = response_amplitude(sensor, capped) / response_amplitude(
+            sensor, frequency
+        )
+        if fraction < FLAT_BAND_FRACTION:
+            notes.append(
+                f"the sensor gives {fraction * 100:.3g}% of its gain at {capped:g} "
+                f"Hz: the {rate:g} sps channel sees none of its flat band"
+            )
         frequency = capped
 
     return frequency, notes
@@ -369,7 +385,9 @@ def combine_responses(
                 response_stages=stages,
             )
         case _:
-            frequency, capped = sensitivity_frequency(stages, output_rate(stages))
+            frequency, capped = sensitivity_frequency(
+                stages, first, output_rate(stages)
+            )
             notes += capped
             combined = Response(
                 instrument_sensitivity=InstrumentSensitivity(

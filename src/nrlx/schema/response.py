@@ -9,7 +9,10 @@ from typing import Literal
 import msgspec
 from obspy.core.inventory.response import Response
 
-ResponseFormat = Literal["resp", "stationxml", "stationxml-resp"]
+ResponseFormat = Literal["resp", "stationxml"]
+
+# where the NRL parts come from: the service, or the local copy
+Source = Literal["service", "local"]
 
 
 class ResponseInput(
@@ -50,6 +53,7 @@ class ResponseInput(
         elevation: elevation in metres, with the coordinates.
         depth: depth of the sensors below the surface in metres, with the
             coordinates.
+        source: where the NRL parts come from, the service or the local copy.
 
 
     """
@@ -70,6 +74,7 @@ class ResponseInput(
     longitude: float | None = None
     elevation: float = 0.0
     depth: float = 0.0
+    source: Source = "service"
 
     def __post_init__(self) -> None:
         # a part by keys or by a response, not both

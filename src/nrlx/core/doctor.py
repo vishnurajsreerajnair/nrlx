@@ -67,7 +67,7 @@ def check_response(
     match format:
         case "resp":
             findings = check_resp(content)
-        case "stationxml" | "stationxml-resp":
+        case "stationxml":
             findings = check_stationxml(content)
 
     return findings

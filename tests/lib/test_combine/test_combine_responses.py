@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import math
 from pathlib import Path
 
 import obspy
@@ -182,8 +183,8 @@ def test_sensor_and_datalogger_need_a_voltage():
 def test_sensitivity_frequency_is_capped_by_the_output_rate():
     stages = read("nrl_part_sts2").response_stages
 
-    kept, none = sensitivity_frequency(stages, 100.0)
-    capped, notes = sensitivity_frequency(stages, 1.0)
+    kept, none = sensitivity_frequency(stages, stages, 100.0)
+    capped, notes = sensitivity_frequency(stages, stages, 1.0)
 
     assert (kept, none) == (1.0, [])
     assert capped == pytest.approx(0.1)
@@ -196,3 +197,42 @@ def test_sensitivity_frequency_is_capped_by_the_output_rate():
 def test_output_rate():
     assert output_rate(read("nrl_part_centaur").response_stages) == 100.0
     assert output_rate(read("nrl_part_sts2").response_stages) is None
+
+
+def geophone(corner: float) -> Response:
+    """A geophone of 28.8 V/(m/s) at 45 Hz with its corner at corner Hz"""
+    omega = 2.0 * math.pi * corner
+    damped = complex(-0.7 * omega, 0.714 * omega)
+    stage = PolesZerosResponseStage(
+        1,
+        28.8,
+        45.0,
+        "M/S",
+        "V",
+        "LAPLACE (RADIANS/SECOND)",
+        45.0,
+        zeros=[0j, 0j],
+        poles=[damped, damped.conjugate()],
+        normalization_factor=1.0,
+    )
+    return Response(response_stages=[stage])
+
+
+def test_sensitivity_out_of_the_flat_band_of_the_sensor_is_noted():
+    # a 10 Hz geophone on a 1 sps channel: every frequency is below its corner
+    sensor = geophone(10.0)
+    stages = sensor.response_stages
+
+    frequency, notes = sensitivity_frequency(stages, stages, 1.0)
+
+    assert frequency == pytest.approx(0.1)
+    assert notes[1].startswith("the sensor gives 0.01% of its gain at 0.1 Hz")
+    assert notes[1].endswith("the 1 sps channel sees none of its flat band")
+
+
+def test_a_broadband_sensor_on_a_slow_channel_stays_in_its_flat_band():
+    stages = read("nrl_part_sts2").response_stages
+
+    _, notes = sensitivity_frequency(stages, stages, 1.0)
+
+    assert len(notes) == 1

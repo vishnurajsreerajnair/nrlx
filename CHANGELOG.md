@@ -31,6 +31,20 @@ command, `nrlx response`; the Python API changes as listed below.
   command line keeps the file options. The rules of the parts, the labels, the
   times and the place (`ResponseInput`) are checked before any table, so a wrong
   request fails before suggesting `-o FILE`; `-i` refuses the file options.
+- **Local copy of the NRL**, `nrlx local sync|status|remove`. `sync` downloads
+  the catalog, the code table and the zip of the whole NRL (`/combine` with
+  `instconfig=full_NRL_v2_zip`, about 300 MB, streamed to disk by
+  `io.service.download`), unzips it to `<cache>/nrl/NRL` in the layout of the zip
+  (refusing a member that would leave the folder), notes the configurations of
+  the catalog without a file (today one, the Lunitek LK-TEMP), then puts the
+  three in place together and deletes the zip; a failure keeps the previous copy.
+  `status` shows the folder, the files, the size and the date; `remove` asks
+  first (`--yes` to skip) and keeps the catalog. `nrlx response --source local`
+  and `Nrlx.response(source="local")` build without any request: a part alone is
+  its file, two parts are combined by nrlx. `Nrlx.sync_local`, `Nrlx.local_tree`
+  (set by `from_cache` when the copy exists), `Nrlx.part(instconfig, source)`,
+  `Nrlx.local_file`, and `io.local` (`get_tree_dir`, `get_part_file`,
+  `extract_tree`, `missing_parts`, `install_tree`, `remove_tree`, `tree_size`).
 - `core.matching.varying_values`, the values of each parameter that differs
   between configurations.
 - **Combination of any sensor and datalogger responses**, done by nrlx instead of
@@ -46,7 +60,9 @@ command, `nrlx response`; the Python API changes as listed below.
   factor 2, a REFTEK RT131A-02 by 8.8), which obspy applies as written when the
   channel sensitivity is at the sensor's frequency. The overall sensitivity is at
   the sensor's normalization frequency, at most a tenth of the output rate (the
-  sensor's 1 Hz is out of band at 1 sps). Checked against the service on real NRL
+  sensor's 1 Hz is out of band at 1 sps); a note says when the sensor gives less
+  than half its gain there, as a geophone on a slow channel that sees none of its
+  flat band (an HG-7 at 8 sps: 0.16 %). Checked against the service on real NRL
   parts (same stages) and against obspy on 300 random NRL pairs (the
   sensitivity obspy computes from the written file equals nrlx's to 1e-14).
 - `core.gain`: the amplitude of the response stages computed directly, with the
@@ -161,8 +177,10 @@ command, `nrlx response`; the Python API changes as listed below.
   doctor checks to `nrlx.core.doctor` and the CLI to `nrlx.tools.cmd` (the
   `nrlx` entry point is `nrlx.tools.cmd:app`). `from nrlx import Nrlx,
   BuiltResponse, Catalog, ResponseFormat` keeps working.
-- `ResponseFormat` is a `Literal["resp", "stationxml", "stationxml-resp"]`
-  instead of an enum: pass `format="resp"` instead of `ResponseFormat.RESP`.
+- `ResponseFormat` is a `Literal["resp", "stationxml"]` instead of an enum: pass
+  `format="resp"` instead of `ResponseFormat.RESP`. `stationxml-resp`, left from
+  `nrlx build`, is removed: `nrlx doctor --format` takes `resp` or `stationxml`,
+  as `nrlx response` does.
 - `Catalog` is the decoded JSON tree: `get_elements`, `get_manufacturers`,
   `get_models` and `get_configurations` return the nodes with their parents, for
   example `(element, manufacturer, model, configuration)`, and `resolve` returns

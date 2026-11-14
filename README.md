@@ -68,6 +68,7 @@ builds are obspy objects in memory (see [Python library](#python-library)).
 | `nrlx sync` | Download the current NRL catalog and code table into the local cache. |
 | `nrlx prefixes [query]` | Decode the two-letter parameter codes of the instconfigs (LP, FR, FV, ...). |
 | `nrlx response` | Find configurations by keys, and write their response (StationXML or RESP). |
+| `nrlx local sync\|status\|remove` | Keep a local copy of the whole NRL, for `nrlx response --source local`. |
 | `nrlx doctor <file>` | Run structural health checks on a saved response file. |
 
 Run `nrlx <command> --help` for the full option list.
@@ -140,6 +141,25 @@ nrlx response --sensor-file my_sensor.xml#XX.SENS..HHZ \
   sensitivity as obspy does. Notes say what was filled or corrected.
 - `-i` asks the NRL parts only, so it does not take a file.
 
+### Offline: the local NRL
+
+```bash
+nrlx local sync          # the whole NRL: about 300 MB to download, 2.8 GB on disk
+nrlx response --sensor luni,tellus,LP=1 \
+  --datalogger centaur,FR=100,FV=40Vpp,DF=Off,FP=Linear --source local -o st.xml
+nrlx local status        # folder, files, size, date
+nrlx local remove        # asks first (--yes to skip); the catalog stays
+```
+
+- `nrlx local sync` downloads the catalog, the code table and the zip of the
+  whole NRL from the service, unzips it in the cache (`<cache>/nrl/NRL`, the
+  layout of the zip, which obspy's NRL client also opens) and checks that every
+  configuration of the catalog has its file. The three replace the previous ones
+  together; a failure keeps the previous copy.
+- `--source local` builds without any request: a part alone is its file, a
+  sensor and a datalogger are combined by nrlx (as with `--sensor-file`). With
+  `--source service` (the default) the service combines the NRL parts.
+
 ## Python library
 
 Everything the CLI does is a thin layer over the `nrlx` package:
@@ -193,8 +213,8 @@ Working end to end against the live NRL v2 service (released 0.2.x on PyPI; 0.1.
 was an early skeleton, yanked): finding by keys and conditions, sensor and
 datalogger combination (also with your own sensor or datalogger files),
 StationXML and RESP writing with any channel codes, and the structural `doctor`
-check. Planned next: a local copy of the NRL repository, format conversion,
-deeper doctor checks and local sensor assets. See [CHANGELOG.md](CHANGELOG.md) for details.
+check, and a local copy of the NRL to build offline. Planned next: format
+conversion, deeper doctor checks and local sensor assets. See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Note for developers
 
