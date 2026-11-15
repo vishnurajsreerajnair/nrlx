@@ -69,6 +69,7 @@ builds are obspy objects in memory (see [Python library](#python-library)).
 | `nrlx prefixes [query]` | Decode the two-letter parameter codes of the instconfigs (LP, FR, FV, ...). |
 | `nrlx response` | Find configurations by keys, and write their response (StationXML, RESP or SACPZ). |
 | `nrlx convert <file> -o <out>` | Convert a response file to StationXML, RESP or SACPZ, read back and checked. |
+| `nrlx assets add\|list\|get\|deprecate\|delete\|export\|import` | Keep the responses you build, by UID and versioned, in a database you can share. |
 | `nrlx local sync\|status\|remove` | Keep a local copy of the whole NRL, for `nrlx response --source local`. |
 | `nrlx doctor <file>` | Run structural health checks on a saved response file. |
 
@@ -182,8 +183,54 @@ nrlx convert "station.xml#XY.MYSTN.00.BHZ" -o bhz.pz
 - SACPZ keeps only the first poles and zeros stage and the overall sensitivity;
   a note says how far that is from the whole response (an STS-2 on a Q330 at
   40 sps: within 4.9 % up to 3.6 Hz, 28.9 % at 16 Hz). Channels SACPZ cannot hold
-  (no poles and zeros, or an input other than m, m/s or m/s**2) are refused
-  before writing, where obspy would skip them silently.
+  (no analog poles and zeros, or an input other than m, m/s or m/s**2) are
+  refused before writing, where obspy would skip them silently.
+- The SACPZ constant is A0 × the overall sensitivity, as rdseed, IRIS and obspy
+  write it. That holds only when A0 normalizes the poles and zeros at the
+  frequency of the sensitivity, so nrlx normalizes them there first: a geophone
+  normalized at 100 Hz on a 1 sps channel, whose sensitivity is at 0.1 Hz, gets
+  a SACPZ within 0.02 % of its response instead of 100 % off.
+- A RESP file has no sample rate: obspy takes it from the decimation and rounds
+  it to an integer, so a channel below 0.5 sps reads 0. nrlx takes the exact
+  rate of the last decimation, for `convert`, `assets add` and the file parts.
+- nrlx reads dataless SEED but never writes it. Beware of dataless files written
+  by obspy (`Parser.write_seed`, obspy 1.5): a SEED blockette holds at most 9999
+  bytes, and obspy writes a longer one, such as a FIR of more than about 415
+  coefficients, without splitting it, so the file is corrupt from that stage on.
+  15 of 46 random NRL builds have such a FIR; `nrlx convert` then fails with "No
+  response to write". Use StationXML or RESP to move those responses.
+
+### Assets: the responses you keep
+
+```bash
+nrlx response --sensor streckeisen,STS-2,EG3,SG=1500 \
+  --datalogger Q330HR_PG1,FR=40,ADHR,LRbelow100 \
+  --network XY --station T13 --channels HHZ,HHN,HHE -o t13.xml --add-asset
+nrlx assets list                          # every version, with its variant
+nrlx assets get T13 FR=40 -o t13.resp     # the latest in use that the keys pick
+nrlx assets add calibrated.xml --uid EB696
+nrlx assets deprecate T13 --version 1     # --undo puts it back
+nrlx assets export share/                 # share/T13/v1.xml ... + manifest.json
+nrlx assets import share/                 # or another .sqlite
+```
+
+- An asset is a StationXML file as built, stored whole under a UID: the station
+  code by default, `--uid` for another (a serial number follows the unit from
+  station to station). `--add-asset` works with or without `-o`.
+- The versions of a UID are numbered in one sequence. A response the UID already
+  has is not added again (a note on `nrlx response`, an error on `assets add`).
+- `get` picks the latest version in use whose NRL parts match the keys of
+  `nrlx response` (`STS-2`, `FR=40`), and `rate=` and `units=` on the file; when
+  the keys leave several variants it lists them. `--version N` gets any version,
+  deprecated or not. The file written is read back and checked, as by `convert`.
+- `nrlx response` writes a comment on each StationXML channel with the
+  instconfigs it was built from (`built by nrlx 0.3.0: sensor=... datalogger=...`),
+  so the NRL keys also pick the files added later with `assets add`.
+- The database is `assets.sqlite` in the cache folder (`--db` for another).
+  `nrlx local remove` never touches it, but deleting the cache folder by hand
+  does: export it to keep a copy. To share, export and import rather than
+  writing to one database on a network drive, where SQLite's locking is not
+  reliable.
 
 ## Python library
 
@@ -223,6 +270,12 @@ inventory, notes = nrl.response(
 
 inventory.write("station.xml", format="STATIONXML")   # an obspy Inventory
 text = write_resp(inventory)                          # RESP, which obspy cannot write
+
+# Assets: the same database as the CLI (Nrlx.from_cache(assets_db=...) for another)
+row = nrl.assets.add(inventory, uid="EB696")          # UID: the station by default
+inventory = nrl.assets.get("EB696", ["FR=100"])       # or version=2
+for row in nrl.assets.list():
+    print(row.uid, row.version, row.sample_rate, row.deprecated)
 ```
 
 nrlx raises built-in exceptions: `LookupError` when a part matches no
@@ -250,9 +303,9 @@ importing only the ones below it:
 | Layer | Holds |
 | --- | --- |
 | `nrlx/schema/` | msgspec structs of every input: the NRL service JSON (`catalog`, `prefixes`), the cache files, and the request `response`, with its validation |
-| `nrlx/models/` | the structs with their methods (`Catalog`, `Found`), plus `Nrlx` |
+| `nrlx/models/` | the structs with their methods (`Catalog`, `Found`, `Assets`), plus `Nrlx` |
 | `nrlx/core/` | pure functions on plain values: matching, SEED band codes, `/combine` parameters, the combination of responses, the amplitudes of the stages, the conversion checks, doctor checks |
-| `nrlx/io/` | the NRL service (httpx), the local cache and the local NRL, obspy reading, labelling and writing, the RESP writer, the SACPZ reader |
+| `nrlx/io/` | the NRL service (httpx), the local cache and the local NRL, the assets database (SQLite) and its exports, obspy reading, labelling and writing, the RESP writer, the SACPZ reader |
 | `nrlx/tools/cmd/` | the `nrlx` commands, the only code that prints and exits |
 
 Library code raises built-in exceptions, and each command catches the ones it

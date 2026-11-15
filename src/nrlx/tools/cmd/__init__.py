@@ -7,6 +7,7 @@ from typing import Annotated
 import typer
 
 import nrlx
+from nrlx.tools.cmd.assets import assets_app
 from nrlx.tools.cmd.catalog import prefixes, status, sync
 from nrlx.tools.cmd.convert import convert
 from nrlx.tools.cmd.doctor import doctor
@@ -51,3 +52,4 @@ app.command()(response)
 app.command()(convert)
 app.command()(doctor)
 app.add_typer(local_app, name="local")
+app.add_typer(assets_app, name="assets")

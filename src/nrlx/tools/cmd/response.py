@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import shlex
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
 import httpx
 import typer
+from obspy import Inventory
 from obspy.core.inventory.response import Response
 from rich.console import Console
 from rich.markup import escape
@@ -16,11 +18,13 @@ from rich.panel import Panel
 from rich.prompt import IntPrompt, Prompt
 from rich.table import Table
 
+from nrlx.core.assets import check_uid
 from nrlx.core.convert import output_format
 from nrlx.core.matching import varying_values
 from nrlx.core.seed import band_codes
 from nrlx.io.inventory import read_part, split_channels, write_inventory
 from nrlx.io.service import DEFAULT_BASE_URL
+from nrlx.models.assets import Assets
 from nrlx.models.catalog import Found
 from nrlx.models.nrlx import Nrlx
 from nrlx.schema.prefixes import PrefixInput
@@ -154,6 +158,22 @@ def response(
             help="Where the NRL parts come from: service, or local (nrlx local sync).",
         ),
     ] = "service",
+    add_asset: Annotated[
+        bool,
+        typer.Option(
+            "--add-asset",
+            help="Also store the response as the next version of an asset (UID: "
+            "the station, or --uid).",
+        ),
+    ] = False,
+    uid: Annotated[
+        str | None,
+        typer.Option("--uid", help="UID of the asset, instead of the station."),
+    ] = None,
+    db: Annotated[
+        Path | None,
+        typer.Option("--db", help="Assets database, instead of the cache one."),
+    ] = None,
     cache_root: Annotated[
         Path | None,
         typer.Option("--cache-root", help="Custom cache root directory."),
@@ -230,6 +250,26 @@ def response(
         )
     given = [(part, partkeys) for part, partkeys in selections if partkeys is not None]
 
+    # the UID of the asset: --uid, or the station; checked before any request
+    if uid is not None and not add_asset:
+        errconsole.print(
+            "[bold red]Error:[/bold red] --uid names the asset of --add-asset."
+        )
+        raise typer.Exit(code=1)
+    if add_asset:
+        named = uid if uid is not None else station
+        if named is None:
+            errconsole.print(
+                "[bold red]Error:[/bold red] --add-asset needs --station or --uid: "
+                "the UID of the asset."
+            )
+            raise typer.Exit(code=1)
+        try:
+            check_uid(named)
+        except ValueError as err:
+            errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
+            raise typer.Exit(code=1) from err
+
     # bare keys explore; the parts are what -o writes
     if keys and (given or files):
         errconsole.print(
@@ -237,7 +277,7 @@ def response(
             "in --sensor, --datalogger, --integrated or --soh."
         )
         raise typer.Exit(code=1)
-    if output is not None and not (given or files):
+    if (output is not None or add_asset) and not (given or files):
         errconsole.print(
             "[bold red]Error:[/bold red] Writing needs a part: --sensor, "
             "--datalogger, --integrated, --soh, or a file with --sensor-file or "
@@ -315,13 +355,13 @@ def response(
 
         # every part one configuration: the line to write it, or the file
         if len(unique) < len(given):
-            if output is not None:
+            if output is not None or add_asset:
                 errconsole.print(
                     "[bold red]Error:[/bold red] Each part must match one "
                     "configuration before writing: add keys from the tables."
                 )
                 raise typer.Exit(code=1)
-        elif output is None:
+        elif output is None and not add_asset:
             exact: list[tuple[str, list[str] | None]] = [
                 (part, [instconfig]) for part, instconfig in unique
             ]
@@ -353,6 +393,9 @@ def response(
                 output,
                 response_format,
                 split,
+                add_asset,
+                uid,
+                db,
             )
 
 
@@ -372,11 +415,14 @@ def write(
     longitude: float | None,
     elevation: float,
     depth: float,
-    output: Path,
+    output: Path | None,
     response_format: ResponseFormat | None,
     split: bool,
+    add_asset: bool,
+    uid: str | None,
+    db: Path | None,
 ) -> None:
-    """Build the response and write its file or files
+    """Build the response, write its file or files, and add it as an asset
 
     Args:
         nrl: catalog, code table and service.
@@ -395,20 +441,24 @@ def write(
         longitude: longitude in degrees.
         elevation: elevation in metres.
         depth: depth below the surface in metres.
-        output: file to write, the name of each file with --split.
+        output: file to write, the name of each file with --split; None to add
+            the asset only.
         response_format: stationxml, resp or sacpz; None for the extension of the
             file.
         split: whether to write one file per channel.
+        add_asset: whether to store the response as the next version of an asset.
+        uid: UID of the asset, None for the station.
+        db: database of the assets, None for the one of the cache.
 
 
     """
     # the format, from the option or the extension
+    fileformat: ResponseFormat = "stationxml"
     try:
-        fileformat = (
-            response_format
-            if response_format is not None
-            else output_format(output.suffix)
-        )
+        if response_format is not None:
+            fileformat = response_format
+        elif output is not None:
+            fileformat = output_format(output.suffix)
     except ValueError as err:
         errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
         raise typer.Exit(code=1) from err
@@ -444,8 +494,9 @@ def write(
         errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
         raise typer.Exit(code=1) from err
 
-    # one file, or one per channel named by its SEED id
-    if split:
+    # one file, or one per channel named by its SEED id; none for the asset only
+    files: list[tuple[Path, Inventory]] = list()
+    if output is not None and split:
         files = [
             (
                 output.with_name(f"{output.stem}_{seedid}{output.suffix}"),
@@ -453,7 +504,7 @@ def write(
             )
             for seedid, single in split_channels(inventory)
         ]
-    else:
+    elif output is not None:
         files = [(output, inventory)]
     try:
         for path, content in files:
@@ -474,17 +525,42 @@ def write(
         and band_codes(channel.sample_rate)
         and channel.code[:1] not in band_codes(channel.sample_rate)
     ]
+    # the asset: the whole inventory, a response it already has is a note
+    added = ""
+    if add_asset:
+        assets = (
+            nrl.assets
+            if db is None
+            else Assets(db=db, catalog=nrl.catalog, prefixes=nrl.prefixes)
+        )
+        named = uid if uid is not None else station or ""
+        try:
+            duplicate = assets.duplicate_of(inventory, named)
+            if duplicate is not None:
+                notes.append(
+                    f"note: {named} already has this response as "
+                    f"v{duplicate.version}: not added"
+                )
+            else:
+                row = assets.add(inventory, named)
+                added = f"Added asset {row.uid} v{row.version} ({assets.db})"
+        except (OSError, ValueError, sqlite3.Error) as err:
+            errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
+            raise typer.Exit(code=1) from err
+
     for note in notes:
         console.print(escape(note))
 
-    written = "\n".join(f"  {escape(str(path))}" for path, _ in files)
-    console.print(
-        Panel.fit(
-            f"Response written ({fileformat})\n\n{written}",
-            title="nrlx",
-            border_style="green",
-        )
-    )
+    # the files written and the asset added
+    shown: list[str] = list()
+    if files:
+        written = "\n".join(f"  {escape(str(path))}" for path, _ in files)
+        shown.append(f"Response written ({fileformat})\n\n{written}")
+    if added:
+        shown.append(escape(added))
+    if not shown:
+        shown.append("Nothing written: the asset already has this response")
+    console.print(Panel.fit("\n\n".join(shown), title="nrlx", border_style="green"))
 
 
 def show_tree(nrl: Nrlx) -> None:

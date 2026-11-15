@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from pathlib import Path
 
 import obspy
 import pytest
 from obspy import UTCDateTime
+from obspy.core.inventory.response import (
+    InstrumentSensitivity,
+    PolesZerosResponseStage,
+    Response,
+)
 
+from nrlx.core.convert import pz_amplitude
 from nrlx.io.inventory import (
     label_channels,
     placeholder_inventory,
@@ -18,6 +25,7 @@ from nrlx.io.inventory import (
     verify_written,
     write_inventory,
 )
+from nrlx.io.sacpz import read_sacpz
 
 DATA_DIR = Path(__file__).parents[2] / "data"
 
@@ -163,6 +171,15 @@ def test_read_channels_keeps_every_channel_or_one(station_xml):
     assert [cha.code for cha in one[0][0]] == ["HHN"]
 
 
+def test_read_channels_merges_the_stations_obspy_splits_in_resp(station_xml, tmp_path):
+    resp = write_inventory(read_channels(station_xml), tmp_path / "st.resp", "resp")
+
+    [network] = read_channels(resp)
+
+    [station] = network
+    assert [cha.code for cha in station] == ["HHZ", "HHN", "HHE"]
+
+
 def test_read_channels_unknown_seed_id_lists_the_channels(station_xml):
     with pytest.raises(LookupError, match=r"No channel XY.T13.00.BHZ in .*HHE"):
         read_channels(station_xml, "XY.T13.00.BHZ")
@@ -262,3 +279,74 @@ def test_write_inventory_refuses_a_channel_without_response(station_xml, tmp_pat
 
     with pytest.raises(ValueError, match="No response to write for XY.T13.00.HHE"):
         write_inventory(inventory, tmp_path / "station.xml", "stationxml")
+
+
+def test_read_channels_gives_the_rate_obspy_rounds_to_zero_in_resp(tmp_path):
+    inventory = read_channels(DATA_DIR / "nrl_sts2_q330.xml")
+    channel = inventory[0][0][0]
+    # the last decimation from 0.4 to 0.1 sps: obspy reads round(0.1) = 0
+    last = channel.response.response_stages[-1]
+    last.decimation_input_sample_rate, last.decimation_factor = 0.4, 4
+    channel.sample_rate = 0.1
+    resp = write_inventory(inventory, tmp_path / "slow.resp", "resp")
+
+    assert obspy.read_inventory(str(resp))[0][0][0].sample_rate == 0
+    assert read_channels(resp)[0][0][0].sample_rate == pytest.approx(0.1)
+
+
+def geophone(frequency: float) -> obspy.Inventory:
+    """A 4.5 Hz geophone normalized at 100 Hz, its sensitivity at a frequency"""
+    corner = 2 * math.pi * 4.5
+    stage = PolesZerosResponseStage(
+        stage_sequence_number=1,
+        stage_gain=28.8,
+        stage_gain_frequency=100.0,
+        input_units="M/S",
+        output_units="V",
+        pz_transfer_function_type="LAPLACE (RADIANS/SECOND)",
+        normalization_frequency=100.0,
+        zeros=[0j, 0j],
+        poles=[
+            complex(-0.7 * corner, 0.714 * corner),
+            complex(-0.7 * corner, -0.714 * corner),
+        ],
+        normalization_factor=1.0,
+    )
+    stage.normalization_factor = stage.calculate_normalization_factor()
+    response = Response(
+        instrument_sensitivity=InstrumentSensitivity(28.8, 100.0, "M/S", "V"),
+        response_stages=[stage],
+    )
+    response.recalculate_overall_sensitivity(frequency)
+    return placeholder_inventory(response, None)
+
+
+def test_sacpz_constant_is_right_when_the_sensitivity_is_not_at_a0(tmp_path):
+    inventory = geophone(0.1)
+    response = inventory[0][0][0].response
+    pz = write_inventory(inventory, tmp_path / "geophone.pz", "sacpz")
+
+    [(_, zeros, poles, constant)] = read_sacpz(pz.read_text())
+
+    frequencies = [0.1, 1.0, 4.5, 10.0, 100.0]
+    whole = response.get_evalresp_response_for_frequencies(frequencies, output="DISP")
+    written = [pz_amplitude(zeros, poles, constant, f) for f in frequencies]
+    assert written == pytest.approx([abs(value) for value in whole], rel=1e-5)
+    # obspy alone writes A0 at 100 Hz times the sensitivity at 0.1 Hz
+    first = response.response_stages[0]
+    assert constant != pytest.approx(
+        first.normalization_factor * response.instrument_sensitivity.value, rel=0.01
+    )
+    # the inventory given is not changed
+    assert first.normalization_frequency == 100.0
+    [note] = verify_written(inventory, pz, "sacpz")
+    assert "within 0.00%" in note
+
+
+def test_sacpz_refuses_a_digital_first_poles_and_zeros(tmp_path):
+    inventory = geophone(1.0)
+    first = inventory[0][0][0].response.response_stages[0]
+    first.pz_transfer_function_type = "DIGITAL (Z-TRANSFORM)"
+
+    with pytest.raises(ValueError, match="analog poles and zeros"):
+        write_inventory(inventory, tmp_path / "digital.pz", "sacpz")

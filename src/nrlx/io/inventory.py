@@ -9,13 +9,15 @@ from datetime import datetime
 from pathlib import Path
 
 from obspy import Inventory, UTCDateTime, read_inventory
-from obspy.core.inventory import Channel, Network, Station
+from obspy.core.inventory import Channel, Comment, Network, Station
 from obspy.core.inventory.response import (
     PolesZerosResponseStage,
     PolynomialResponseStage,
     Response,
 )
 
+from nrlx.core.assets import PROVENANCE_SUBJECT
+from nrlx.core.combine import output_rate
 from nrlx.core.convert import (
     LOSSLESS_TOLERANCE,
     check_frequencies,
@@ -26,11 +28,16 @@ from nrlx.io.resp import write_resp
 from nrlx.io.sacpz import read_sacpz
 from nrlx.schema.response import ResponseFormat
 
-# the start of the validity in the placeholders of the NRL service
+# the start of the validity and the codes in the placeholders of the NRL service
 PLACEHOLDER_START = UTCDateTime(1970, 1, 1)
+PLACEHOLDER_NETWORK = "XX"
+PLACEHOLDER_STATION = "YY"
 
 # the input units SACPZ holds, converted to displacement (obspy's writer)
 SACPZ_UNITS = ["M", "M/S", "M/SEC", "M/S**2", "M/SEC**2"]
+
+# the poles and zeros SACPZ holds: analog, in rad/s or in Hz (obspy converts)
+SACPZ_TRANSFER_TYPES = ["LAPLACE (RADIANS/SECOND)", "LAPLACE (HERTZ)"]
 
 
 def read_stationxml(content: bytes) -> Inventory:
@@ -53,6 +60,9 @@ def read_channels(path: Path, seed_id: str | None = None) -> Inventory:
     """Channels of a file, every one or those of a SEED id
 
     Any format obspy reads (StationXML, RESP, dataless SEED, XSEED, SC3ML).
+    Stations with the same code and start date are merged, as obspy splits the
+    channels of RESP, and a rate obspy reads as 0 from a RESP below 0.5 sps is
+    the output rate of the decimations.
 
     Args:
         path: file of the responses.
@@ -75,6 +85,27 @@ def read_channels(path: Path, seed_id: str | None = None) -> Inventory:
     except TypeError as err:
         # obspy's error for an unknown format
         raise ValueError(f"Cannot read {path}: {err}") from err
+    # obspy reads each channel of a RESP file in a station of its own: one station
+    # per code and start date (as text: obspy's dates are not hashable), with all
+    # their channels
+    for net in inventory:
+        stations: dict[tuple[str, str], Station] = dict()
+        for sta in net:
+            key = (sta.code, str(sta.start_date))
+            if key in stations:
+                stations[key].channels += sta.channels
+            else:
+                stations[key] = sta
+        net.stations = list(stations.values())
+
+    # obspy reads the rate of a RESP file as an integer (input rate over the
+    # decimation, rounded), so a channel below 0.5 sps reads 0: its rate is the
+    # output of its last decimation
+    for net in inventory:
+        for sta in net:
+            for cha in sta:
+                if not cha.sample_rate and cha.response is not None:
+                    cha.sample_rate = output_rate(cha.response.response_stages)
     ids = sorted(
         {
             f"{net.code}.{sta.code}.{cha.location_code}.{cha.code}"
@@ -184,7 +215,10 @@ def write_inventory(
 
     StationXML and SACPZ by obspy, RESP by write_resp. SACPZ holds the channels
     with poles and zeros and an input in m, m/s or m/s**2 only: obspy would skip
-    the others, so they are refused before writing.
+    the others, so they are refused before writing. Its constant is A0 times the
+    overall sensitivity (rdseed, IRIS and obspy), right only when A0 normalizes
+    the poles and zeros at the frequency of the sensitivity: the first poles and
+    zeros stage of a copy is normalized there before obspy writes it.
 
     Args:
         inventory: inventory of responses.
@@ -215,27 +249,55 @@ def write_inventory(
         case "resp":
             path.write_text(write_resp(inventory))
         case "sacpz":
+            # the first poles and zeros stage of each channel, the one SACPZ keeps
+            firsts = [
+                next(
+                    (
+                        stage
+                        for stage in cha.response.response_stages
+                        if isinstance(stage, PolesZerosResponseStage)
+                    ),
+                    None,
+                )
+                for _, cha in channels
+            ]
             refused = [
                 seedid
-                for seedid, cha in channels
+                for (seedid, cha), first in zip(channels, firsts, strict=True)
                 if cha.response.instrument_sensitivity is None
                 or (cha.response.instrument_sensitivity.input_units or "").upper()
                 not in SACPZ_UNITS
-                or not any(
-                    isinstance(stage, PolesZerosResponseStage)
-                    for stage in cha.response.response_stages
-                )
+                or first is None
+                or first.pz_transfer_function_type not in SACPZ_TRANSFER_TYPES
             ]
             if refused:
                 raise ValueError(
-                    "SACPZ holds only the channels with poles and zeros and an input "
-                    f"in m, m/s or m/s**2: not {', '.join(refused)}."
+                    "SACPZ holds only the channels with analog poles and zeros and an "
+                    f"input in m, m/s or m/s**2: not {', '.join(refused)}."
                 )
+            # CONSTANT = A0 x sensitivity: A0 of a copy at the sensitivity frequency
+            normalized = inventory.copy()
+            for net in normalized:
+                for sta in net:
+                    for cha in sta:
+                        response = cha.response
+                        frequency = response.instrument_sensitivity.frequency
+                        first = next(
+                            stage
+                            for stage in response.response_stages
+                            if isinstance(stage, PolesZerosResponseStage)
+                        )
+                        if frequency:
+                            first.normalization_frequency = frequency
+                            first.normalization_factor = (
+                                first.calculate_normalization_factor()
+                            )
+
             # obspy warns that it keeps the first poles and zeros: verify_written
             # says it
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
-                inventory.write(str(path), format="SACPZ")
+                normalized.write(str(path), format="SACPZ")
 
     return path
 
@@ -328,36 +390,99 @@ def verify_written(
             if [seedid for seedid, _ in read] != [seedid for seedid, _ in written]:
                 raise ValueError(f"{path} does not hold the channels written.")
             for (seedid, before), (_, after) in zip(written, read, strict=True):
-                polynomial = before.response.instrument_polynomial
-                if polynomial is not None:
-                    # obspy reads the polynomial of StationXML as the one of the
-                    # channel, and the one of RESP as a stage 0
-                    again = [
-                        list(stage.coefficients)
-                        for stage in after.response.response_stages
-                        if isinstance(stage, PolynomialResponseStage)
-                    ]
-                    channel_polynomial = after.response.instrument_polynomial
-                    if channel_polynomial is not None:
-                        again = [list(channel_polynomial.coefficients)]
-                    same = again == [list(polynomial.coefficients)]
-                    difference = 0.0 if same else math.inf
-                elif before.response.instrument_sensitivity is None:
+                difference = response_difference(
+                    before.response, after.response, before.sample_rate
+                )
+                if difference is None:
                     notes.append(f"{seedid}: no sensitivity, the curve is not checked")
-                    difference = 0.0
-                else:
-                    frequencies = check_frequencies(before.sample_rate)
-                    difference = relative_difference(
-                        evalresp_curve(before.response, frequencies),
-                        evalresp_curve(after.response, frequencies),
-                    )
-                if difference > LOSSLESS_TOLERANCE:
+                elif difference > LOSSLESS_TOLERANCE:
                     raise ValueError(
                         f"{path}: {seedid} reads back {difference:.1e} different "
                         "from what was written."
                     )
 
     return notes
+
+
+def response_difference(
+    before: Response, after: Response, sample_rate: float | None
+) -> float | None:
+    """Largest relative difference between the curves of two responses
+
+    A polynomial compares its coefficients: obspy reads the polynomial of
+    StationXML as the one of the channel, and the one of RESP as a stage 0.
+
+    Args:
+        before: response of reference.
+        after: response compared.
+        sample_rate: sample rate of the channel, for the frequencies of the check.
+
+    Returns:
+        the difference at the frequencies of check_frequencies (0 or inf for a
+        polynomial), None when the reference has no sensitivity to compare with.
+
+
+    """
+    polynomial = before.instrument_polynomial
+    difference: float | None = None
+    if polynomial is not None:
+        again = [
+            list(stage.coefficients)
+            for stage in after.response_stages
+            if isinstance(stage, PolynomialResponseStage)
+        ]
+        channel_polynomial = after.instrument_polynomial
+        if channel_polynomial is not None:
+            again = [list(channel_polynomial.coefficients)]
+        same = again == [list(polynomial.coefficients)]
+        difference = 0.0 if same else math.inf
+    elif before.instrument_sensitivity is not None:
+        frequencies = check_frequencies(sample_rate)
+        difference = relative_difference(
+            evalresp_curve(before, frequencies), evalresp_curve(after, frequencies)
+        )
+
+    return difference
+
+
+def stationxml_text(inventory: Inventory) -> str:
+    """StationXML of an inventory, as text
+
+    Args:
+        inventory: inventory written.
+
+    Returns:
+        the StationXML document.
+
+
+    """
+    buffer = io.BytesIO()
+    inventory.write(buffer, format="STATIONXML")
+    text = buffer.getvalue().decode("utf-8")
+
+    return text
+
+
+def set_provenance(inventory: Inventory, text: str) -> Inventory:
+    """Copy of an inventory with a comment on each channel saying what built it
+
+    Args:
+        inventory: inventory built.
+        text: value of the comment (see core.assets.provenance_text), with the
+            subject PROVENANCE_SUBJECT.
+
+    Returns:
+        the inventory with the comments; the given one is not changed.
+
+
+    """
+    marked = inventory.copy()
+    for network in marked:
+        for station in network:
+            for channel in station:
+                channel.comments.append(Comment(text, subject=PROVENANCE_SUBJECT))
+
+    return marked
 
 
 def evalresp_curve(response: Response, frequencies: list[float]) -> list[float]:
@@ -407,8 +532,10 @@ def placeholder_inventory(response: Response, sample_rate: float | None) -> Inve
         start_date=PLACEHOLDER_START,
         response=response,
     )
-    station = Station("YY", 0.0, 0.0, 0.0, [channel], start_date=PLACEHOLDER_START)
-    network = Network("XX", [station], start_date=PLACEHOLDER_START)
+    station = Station(
+        PLACEHOLDER_STATION, 0.0, 0.0, 0.0, [channel], start_date=PLACEHOLDER_START
+    )
+    network = Network(PLACEHOLDER_NETWORK, [station], start_date=PLACEHOLDER_START)
     inventory = Inventory([network], source="nrlx")
 
     return inventory

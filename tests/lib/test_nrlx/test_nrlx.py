@@ -10,6 +10,7 @@ from obspy import UTCDateTime
 from nrlx.io.cache import get_catalog_file, get_prefixes_file
 from nrlx.io.local import FULL_NRL_PARAMS, get_tree_dir
 from nrlx.models.nrlx import Nrlx
+from nrlx.version import __version__
 
 DATA_DIR = Path(__file__).parents[2] / "data"
 
@@ -309,3 +310,36 @@ def test_response_of_a_local_part_alone_notes_what_it_keeps(
 
     assert fake_service.requests == []
     assert "kept as received" in notes[0]
+
+
+def test_response_says_what_built_each_channel(nrl, fake_service, make_stationxml):
+    fake_service.contents["combine"] = make_stationxml("ZZZ")
+
+    inventory, _ = nrl.response(
+        sensor=["STS-2", "SG=1500"], datalogger=["Q330"], channels=["HHZ", "HHN"]
+    )
+
+    comments = [channel.comments for channel in inventory[0][0]]
+    assert [[comment.subject for comment in each] for each in comments] == [
+        ["nrlx"],
+        ["nrlx"],
+    ]
+    assert comments[0][0].value == (
+        f"built by nrlx {__version__}: sensor={SENSOR} datalogger={DATALOGGER}"
+    )
+
+
+def test_response_says_file_for_a_part_from_a_file(nrl, fake_service):
+    fake_service.contents["combine"] = (DATA_DIR / "nrl_part_q330hr.xml").read_bytes()
+    sensor = obspy.read_inventory(DATA_DIR / "nrl_part_ea120.xml")[0][0][0].response
+
+    inventory, _ = nrl.response(sensor_response=sensor, datalogger=["Q330"])
+
+    [comment] = inventory[0][0][0].comments
+    assert comment.value.endswith(f": sensor=file datalogger={DATALOGGER}")
+
+
+def test_assets_of_the_cache(cache_root, tmp_path):
+    assert Nrlx.from_cache(cache_root).assets.db == cache_root / "assets.sqlite"
+    custom = Nrlx.from_cache(cache_root, assets_db=tmp_path / "company.sqlite")
+    assert custom.assets.db == tmp_path / "company.sqlite"

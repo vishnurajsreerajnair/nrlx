@@ -10,6 +10,7 @@ import msgspec
 from obspy import Inventory
 from obspy.core.inventory.response import Response
 
+from nrlx.core.assets import GIVEN_PART, provenance_text
 from nrlx.core.combine import (
     cascade_instconfig,
     combine_params,
@@ -17,6 +18,7 @@ from nrlx.core.combine import (
     output_rate,
     received_notes,
 )
+from nrlx.io.assets import get_assets_file
 from nrlx.io.cache import (
     decode_catalog,
     decode_prefixes,
@@ -33,6 +35,7 @@ from nrlx.io.inventory import (
     read_part,
     read_stationxml,
     set_coordinates,
+    set_provenance,
 )
 from nrlx.io.local import (
     DOWNLOAD_TIMEOUT,
@@ -44,9 +47,11 @@ from nrlx.io.local import (
     missing_parts,
 )
 from nrlx.io.service import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, download, get
+from nrlx.models.assets import Assets
 from nrlx.models.catalog import Catalog, Found
 from nrlx.schema.prefixes import PrefixInput
 from nrlx.schema.response import ResponseInput, Source
+from nrlx.version import __version__
 
 
 class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
@@ -59,6 +64,8 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
         base_url: base URL of the NRL service.
         timeout: timeout of the requests in seconds.
         local_tree: folder of the local copy of the NRL, None without one.
+        assets_db: database of the assets, None for the one of the platform cache
+            folder.
 
 
     """
@@ -68,6 +75,21 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
     base_url: str = DEFAULT_BASE_URL
     timeout: float = DEFAULT_TIMEOUT
     local_tree: Path | None = None
+    assets_db: Path | None = None
+
+    @property
+    def assets(self) -> Assets:
+        """The assets of the database, picked with this catalog and code table
+
+        Returns:
+            the assets of assets_db, or of the database of the cache.
+
+
+        """
+        db = self.assets_db if self.assets_db is not None else get_assets_file()
+        assets = Assets(db=db, catalog=self.catalog, prefixes=self.prefixes)
+
+        return assets
 
     @classmethod
     def from_cache(
@@ -75,6 +97,7 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
         cache_root: Path | None = None,
         *,
         base_url: str = DEFAULT_BASE_URL,
+        assets_db: Path | None = None,
     ) -> Nrlx:
         """Load the catalog and the code table already in the cache, without requests
 
@@ -82,6 +105,8 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             cache_root: custom root folder of the cache, None for the platform cache
                 folder of the user.
             base_url: base URL of the NRL service.
+            assets_db: database of the assets, None for ROOT/assets.sqlite of the
+                cache.
 
         Returns:
             Nrlx with the catalog and the code table of the cache, and the local
@@ -103,6 +128,9 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             prefixes=prefixes,
             base_url=base_url,
             local_tree=tree if tree.is_dir() else None,
+            assets_db=(
+                assets_db if assets_db is not None else get_assets_file(cache_root)
+            ),
         )
 
         return nrl
@@ -159,6 +187,7 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             prefixes=prefixes,
             base_url=base_url,
             local_tree=tree if tree.is_dir() else None,
+            assets_db=get_assets_file(cache_root),
         )
 
         return nrl
@@ -356,8 +385,8 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
         )
 
         # the exact instconfigs, in the order of the signal, before any request
-        instconfigs = [
-            self.catalog.resolve(element, keys, self.prefixes).instconfig
+        resolved = [
+            (element, self.catalog.resolve(element, keys, self.prefixes).instconfig)
             for element, keys in [
                 ("sensor", request.sensor),
                 ("datalogger", request.datalogger),
@@ -366,6 +395,7 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             ]
             if keys is not None
         ]
+        instconfigs = [instconfig for _, instconfig in resolved]
         notes: list[str] = list()
         files = request.sensor_response is not None or (
             request.datalogger_response is not None
@@ -417,6 +447,21 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
                 request.elevation,
                 request.depth,
             )
+
+        # what each channel is built from, in its comments: the parts in the
+        # order of the signal, a part given as a response is a file
+        found = dict(resolved)
+        parts = [
+            (element, GIVEN_PART if part is not None else found[element])
+            for element, part in [
+                ("sensor", request.sensor_response),
+                ("datalogger", request.datalogger_response),
+                ("integrated", None),
+                ("soh", None),
+            ]
+            if part is not None or element in found
+        ]
+        inventory = set_provenance(inventory, provenance_text(__version__, parts))
 
         return inventory, notes
 

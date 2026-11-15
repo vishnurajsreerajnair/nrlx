@@ -47,12 +47,43 @@ command, `nrlx response`; the Python API changes as listed below.
   other than m, m/s or m/s**2 (a pressure sensor, a polynomial).
   `nrlx response -o FILE.pz` writes SACPZ too; `nrlx doctor` refuses it for now.
   `io.inventory.read_channels(path, seed_id)` reads every channel of a file or
-  those of a SEED id, `write_inventory(inventory, path, format)` writes the three
+  those of a SEED id (merging the stations obspy splits when it reads a RESP of
+  several channels, so a RESP converts to one station with all its channels), `write_inventory(inventory, path, format)` writes the three
   formats, `io.sacpz.read_sacpz(text)` reads SACPZ (which obspy writes but does
   not read), and `core.convert` has `output_format` and the amplitudes of the
   check (`pz_amplitude`, `relative_difference`, `check_frequencies`). The tests
   make their dataless SEED at run time, from the RESP of `tests/data`, with
   obspy's `Parser.write_seed`.
+- **Assets**, `nrlx assets add|list|get|deprecate|delete|export|import`: the
+  responses you build or calibrate, kept as the StationXML file as built, under
+  a UID (the station code by default, `--uid` for another), in a SQLite database
+  (`assets.sqlite` in the cache, `--db` for another). `nrlx response
+  --add-asset` stores what it builds, with or without `-o`; the UID is checked
+  before any request, and a response the UID already has gives a note instead of
+  a new version (`nrlx assets add` refuses it). The versions of a UID are one
+  sequence; each keeps the variant of its channels (sample rate, input units,
+  sensitivity, and the NRL instconfigs of the sensor and the datalogger), which
+  must share one response. `get UID [KEYS] -o FILE` writes the latest version in
+  use that the keys pick: the keys of `nrlx response` on the NRL parts (`STS-2`,
+  `FR=40`) and `rate=`, `units=` on the file; several variants left are listed,
+  `--version N` takes any version. The file is written in any of the three
+  formats and read back, as by `nrlx convert`. `deprecate --version N` stops a
+  version from being picked (`--undo` puts it back); `delete` asks first (`--yes`).
+  `export DIR` writes `UID/vN.xml` with a `manifest.json` of the rows (and their
+  SHA-256); `import` merges an export or another database, skipping the versions
+  already here and refusing, before writing anything, one that differs or a file
+  changed since the export. A database of a newer layout (`PRAGMA user_version`)
+  is refused. Python: `Nrlx.assets` (`add`, `select`, `get`, `list`,
+  `deprecate`, `delete`, `export_to`, `import_from`) on `Nrlx.from_cache(...,
+  assets_db=...)`; `models.assets.Assets`, `io.assets`, `core.assets`,
+  `schema.asset.AssetRow`.
+- **Provenance comment**: `Nrlx.response` (and so `nrlx response`) writes on each
+  channel a StationXML comment of subject `nrlx` with the instconfigs it was built
+  from, `built by nrlx 0.2.1: sensor=... datalogger=...` (`file` for a part from a
+  file), so that a file added later as an asset keeps its NRL keys. RESP and
+  SACPZ have no comments and leave it out. `io.inventory.set_provenance`,
+  `stationxml_text`, and `response_difference` (the read-back comparison of
+  `verify_written`, also used by the assets).
 - **Notes on the responses kept as received**, `core.combine.received_notes`:
   the responses nrlx does not combine itself (the service's, and a part alone
   from the local copy) are written as the NRL gives them, and `Nrlx.response`
@@ -228,9 +259,27 @@ command, `nrlx response`; the Python API changes as listed below.
   `--sensor-instconfig`/`--sensor-keys` style flags, `--merge-channels` (one file
   with every channel is now the default, `--split` the other way) and `--zip`.
 - The errors are printed on stderr.
+- The README warns about dataless SEED written by obspy: its writer does not split
+  a blockette over 9999 bytes (a FIR of more than about 415 coefficients), so the
+  file is corrupt from that stage on; nrlx reads dataless and never writes it.
 
 ### Fixed
 
+- **The SACPZ constant when the sensitivity is not at the frequency of A0.**
+  SACPZ writes CONSTANT = A0 × the overall sensitivity (rdseed, IRIS, obspy),
+  right only when A0 normalizes the poles and zeros at the frequency of the
+  sensitivity; StationXML does not require it, and nrlx caps the sensitivity
+  frequency of slow channels. `write_inventory` normalizes the first poles and
+  zeros stage of a copy at the sensitivity frequency (obspy's
+  `calculate_normalization_factor`) before obspy writes the SACPZ. On 45 random
+  NRL builds, 6 SACPZ were 13 to 100 % off in band (geophones on 1 to 50 sps
+  channels); each is now within 1 %. A channel whose first poles and zeros stage
+  is digital is refused, as obspy cannot write it.
+- **The rate of a RESP below 0.5 sps.** obspy reads the rate of a RESP file as
+  the input rate of the last decimation over its factor, rounded to an integer,
+  so a 0.1 sps channel read 0; `io.inventory.read_channels` gives such a channel
+  the exact output rate of its decimations (`core.combine.output_rate`), for
+  `nrlx convert`, `nrlx assets add` and `--sensor-file`/`--datalogger-file`.
 - A code of the table (`FR`) stands for its parameter only: where the configurations
   searched do not have it, the condition matches none and the hint says so, instead
   of falling back to the start of a word (`--sensor FR=100` filtered the sensors by

@@ -117,7 +117,7 @@ def test_convert_refuses_sacpz_without_poles_and_zeros(tmp_path):
     )
 
     assert result.exit_code == 1
-    assert "SACPZ holds only the channels with poles and zeros" in result.output
+    assert "SACPZ holds only the channels with analog poles and zeros" in result.output
     assert not output.exists()
 
 
