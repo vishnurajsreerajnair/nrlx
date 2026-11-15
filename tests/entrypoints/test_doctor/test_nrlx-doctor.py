@@ -115,15 +115,14 @@ def test_doctor_checks_sacpz_with_its_rate(station_xml, tmp_path):
     assert "SACPZ has no stages" in output
 
 
-def test_doctor_shows_why_obspy_cannot_read_a_file(tmp_path):
+def test_doctor_refuses_a_file_obspy_cannot_read(tmp_path):
     path = tmp_path / "response.xml"
     path.write_bytes(b"<html><body>404</body></html>")
 
     code, output = doctor([str(path)])
 
     assert code == 1
-    assert "obspy cannot read it" in output
-    assert "File looks like an HTML error page, not RESP." in output
+    assert "Error: Cannot read" in output
 
 
 def test_doctor_missing_file(tmp_path):

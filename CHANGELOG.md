@@ -115,9 +115,6 @@ command, `nrlx response`; the Python API changes as listed below.
     an instrument code that does not fit the input units (H, L, P in m/s, N in
     m/s**2, D in Pa).
 
-  `guess_format(content)` picks the tier 1 checks (XML or RESP) for a file obspy
-  cannot read.
-
   On the whole NRL v2 they find 18 sensor files with poles of the wrong sign
   (REFTEK RT131, RSensors CME, Guralp CMG-5T, ...), 448 datalogger files with an
   analog DC filter typed as a Z transform (DTCC, MagseisFairfield), 96 with the
@@ -134,6 +131,13 @@ command, `nrlx response`; the Python API changes as listed below.
   180 degrees), and `stage_changes` names the stages that differ (type, gain,
   poles and zeros, coefficients, decimation). `io.inventory.evalresp_values`
   gives the complex response by evalresp; `evalresp_curve` is its amplitude.
+- **End-to-end batteries**, `scripts/e2e/`, behind the validation numbers: the
+  builds by the service, the local copy and files (`build_battery`), `nrlx
+  response` and `nrlx doctor` through the command (`cli_battery`), `nrlx convert`
+  through every format checked by obspy and scipy (`convert_battery`), `nrlx
+  assets` through the commands (`assets_battery`), and every file of the local
+  NRL with the doctor checks (`scan_nrl`). Random parts from a seed; not run by
+  pytest. The mypy override for the missing stubs covers scipy too.
 - **Local copy of the NRL**, `nrlx local sync|status|remove`. `sync` downloads
   the catalog, the code table and the zip of the whole NRL (`/combine` with
   `instconfig=full_NRL_v2_zip`, about 300 MB, streamed to disk by
@@ -293,17 +297,16 @@ command, `nrlx response`; the Python API changes as listed below.
 - `Nrlx.resolve`, `resolve_sensor` and `resolve_datalogger` are
   `Nrlx.catalog.resolve("sensor", ...)`; `Nrlx` holds `catalog`, `base_url` and
   `timeout` instead of an `NRLClient`.
-- The doctor checks are functions, `check_response(content, format)` returning
-  `(severity, message)` pairs, instead of `HealthReport.from_file`.
 - **`nrlx doctor` checks the channels**, no longer only the structure of the
   file: it reads any file obspy reads (`FILE#NET.STA.LOC.CHA` for one channel),
   or SACPZ, and runs the tier 2 checks and the comparison with the NRL nominal
   (`--sensor`, `--datalogger`, `--integrated`, `--source`, `--no-nominal`,
   `--cache-root`, `--base-url`), in a table of one row per channel and five
-  groups, then a line per warning or error (`--all` for every check). The
-  structural checks remain for a file obspy cannot read, picked by
-  `core.doctor.guess_format`. `--format` and `core.doctor.infer_format` are
-  removed: the reader tells the format.
+  groups, then a line per warning or error (`--all` for every check). A file
+  obspy cannot read is an error, with obspy's reason. Removed: `--format`, and
+  the structural checks of the file (`check_response`, `check_resp`,
+  `check_stationxml`, `infer_format`), which said little more once obspy had
+  failed to read it.
 - **Removed, replaced by `nrlx response`**: `nrlx browse` (summary, elements,
   manufacturers, models, configs, show) and `nrlx build`, with its
   `--sensor-instconfig`/`--sensor-keys` style flags, `--merge-channels` (one file

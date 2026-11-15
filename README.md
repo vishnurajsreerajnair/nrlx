@@ -266,7 +266,7 @@ nrlx doctor station.pz                        # SACPZ: poles, constant, codes
   differ. The nominal comes from the source of the comment (`--source` to
   change; service by default), one request per distinct nominal;
   `--no-nominal` skips it. Without a synced catalog the other checks still run.
-- A file obspy cannot read gets the structural checks (XML or RESP) that say why.
+- A file obspy cannot read is an error, with obspy's reason.
 
 ## Python library
 

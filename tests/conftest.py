@@ -159,18 +159,6 @@ def nrl(catalog, prefixes) -> Nrlx:
 
 # responses
 @pytest.fixture
-def valid_response_xml() -> Path:
-    """Path of a minimal StationXML response, XX.YY.00.ZZZ"""
-    return DATA_DIR / "valid_response.xml"
-
-
-@pytest.fixture
-def valid_response_resp() -> Path:
-    """Path of a minimal RESP response, YY.00.ZZZ"""
-    return DATA_DIR / "valid_response.resp"
-
-
-@pytest.fixture
 def make_stationxml() -> Callable[[str], bytes]:
     """Factory of single-channel StationXML documents of XY.MYSTN, with a poles and
     zeros stage of gain 1500 V/(m/s)"""

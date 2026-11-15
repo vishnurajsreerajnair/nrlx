@@ -1,10 +1,9 @@
-"""Health checks of the response files
+"""Health checks of the channels of a response file
 
-Tier 1: structural checks of the content, whether it is well-formed RESP or XML
-with the parts of a response, for a file obspy cannot read. Tier 2: physical checks
-of each channel, its amplitude, its chains of units and rates, its poles and zeros,
-and its codes. Tier 3: each channel against the NRL nominal response of the parts
-it is built from.
+Tier 2: physical checks of each channel, its amplitude, its chains of units and
+rates, its poles and zeros, and its codes. Tier 3: each channel against the NRL
+nominal response of the parts it is built from. (Tier 1, the structure of the
+file, is obspy's reading.)
 
 
 """
@@ -13,10 +12,8 @@ from __future__ import annotations
 
 import cmath
 import math
-import re
 from itertools import pairwise
 from typing import Literal
-from xml.etree import ElementTree
 
 from obspy.core.inventory.response import (
     CoefficientsTypeResponseStage,
@@ -39,145 +36,9 @@ from nrlx.core.gain import (
     numerator_coefficients,
 )
 from nrlx.core.seed import band_codes
-from nrlx.schema.response import ResponseFormat
 
 # info: a check that does not apply (no rate, no sensor stages, a polynomial)
 Severity = Literal["ok", "info", "warning", "error"]
-
-# a line of a RESP blockette, for example B052F03
-BLOCKETTE_LINE = re.compile(r"^B\d{3}F\d{2}\b", re.MULTILINE)
-
-
-def guess_format(content: bytes) -> ResponseFormat:
-    """Format a file that obspy cannot read was meant to be, for the tier 1 checks
-
-    Args:
-        content: content of the file.
-
-    Returns:
-        stationxml for content starting with < that is not an HTML page (an error
-        page saved as a response goes to the RESP checks, which say so), else resp.
-
-
-    """
-    head = content.lstrip()[:1000].lower()
-    guessed: ResponseFormat = (
-        "stationxml" if head.startswith(b"<") and b"<html" not in head else "resp"
-    )
-
-    return guessed
-
-
-def check_response(
-    content: bytes, format: ResponseFormat
-) -> list[tuple[Severity, str]]:
-    """Structural checks of a response, in the RESP or XML format
-
-    Args:
-        content: content of the response file.
-        format: format of the response.
-
-    Returns:
-        severity and message of each check, in check order.
-
-    Raises:
-        ValueError: for a SACPZ file, which doctor does not check yet.
-
-
-    """
-    match format:
-        case "resp":
-            findings = check_resp(content)
-        case "stationxml":
-            findings = check_stationxml(content)
-        case "sacpz":
-            raise ValueError("nrlx doctor does not check SACPZ files yet.")
-
-    return findings
-
-
-def check_resp(content: bytes) -> list[tuple[Severity, str]]:
-    """Structural checks of a RESP response: SEED blockette lines and a stage
-
-    Args:
-        content: content of the RESP file.
-
-    Returns:
-        severity and message of each check, in check order.
-
-
-    """
-    text = content.decode("utf-8", errors="replace")
-
-    # an empty file or an html error page saved as RESP stop the checks
-    findings: list[tuple[Severity, str]] = list()
-    if not text.strip():
-        findings.append(("error", "File is empty."))
-    elif "<html" in text.lower():
-        findings.append(("error", "File looks like an HTML error page, not RESP."))
-    else:
-        # the blockette lines make a RESP file
-        if BLOCKETTE_LINE.search(text):
-            findings.append(("ok", "Contains RESP blockette lines."))
-        else:
-            findings.append(("error", "No RESP blockette lines (e.g. B052F03) found."))
-
-        # a response needs a stage or a gain
-        if any(code in text for code in ["B053F", "B058F", "B054F"]):
-            findings.append(("ok", "Contains a response stage or gain blockette."))
-        else:
-            findings.append(
-                (
-                    "warning",
-                    "No poles/zeros (B053), coefficients (B054), or gain (B058) "
-                    "blockette found — response may be incomplete.",
-                )
-            )
-
-    return findings
-
-
-def check_stationxml(content: bytes) -> list[tuple[Severity, str]]:
-    """Structural checks of a StationXML response: valid XML, response and codes
-
-    Args:
-        content: content of the StationXML file.
-
-    Returns:
-        severity and message of each check, in check order.
-
-
-    """
-    # an empty file or an invalid xml stop the checks
-    findings: list[tuple[Severity, str]] = list()
-    if not content.strip():
-        findings.append(("error", "File is empty."))
-    else:
-        try:
-            root = ElementTree.fromstring(content)
-        except ElementTree.ParseError as err:
-            findings.append(("error", f"Not valid XML: {err}"))
-        else:
-            findings.append(("ok", "Valid XML."))
-
-            # the tags end with the element names, after the namespace
-            tags = [element.tag for element in root.iter()]
-
-            # the response is needed
-            if any(tag.endswith("Response") for tag in tags):
-                findings.append(("ok", "Contains a Response element."))
-            else:
-                findings.append(("error", "No Response element found."))
-
-            # the codes are expected
-            for name in ["Network", "Station", "Channel"]:
-                if any(tag.endswith(name) for tag in tags):
-                    findings.append(("ok", f"Contains a {name} element."))
-                else:
-                    findings.append(("warning", f"No {name} element found."))
-
-    return findings
-
 
 # a stated sensitivity this far from its stages is an error
 SENSITIVITY_ERROR = 0.01

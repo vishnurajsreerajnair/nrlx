@@ -22,9 +22,7 @@ from nrlx.core.doctor import (
     check_nominal_curve,
     check_nominal_kind,
     check_poles,
-    check_response,
     check_sacpz,
-    guess_format,
     stage_changes,
 )
 from nrlx.io.inventory import evalresp_values, read_channels
@@ -95,8 +93,8 @@ def doctor(
     stages, the normalization factors, the flat band, the FIRs), its chains of
     units and rates, its poles and zeros, and its SEED codes. Tier 3 compares it
     with the NRL nominal of the parts it is built from: those of the provenance
-    comment nrlx writes, or --sensor/--datalogger/--integrated. A file obspy
-    cannot read gets the structural checks of tier 1. An error exits with 1.
+    comment nrlx writes, or --sensor/--datalogger/--integrated. An error exits
+    with 1.
 
     Example:
 
@@ -158,16 +156,7 @@ def doctor(
     else:
         try:
             inventory = read_channels(path, selected)
-        except ValueError as err:
-            # obspy cannot read it: the structural checks say why
-            content = path.read_bytes()
-            structure: list[tuple[Severity, str]] = [
-                ("error", f"obspy cannot read it: {err}"),
-                *check_response(content, guess_format(content)),
-            ]
-            show_structural(path, structure)
-            raise typer.Exit(code=1) from err
-        except (OSError, LookupError) as err:
+        except (OSError, ValueError, LookupError) as err:
             errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
             raise typer.Exit(code=1) from err
 
@@ -343,20 +332,3 @@ def style(severity: Severity) -> str:
             styled = "[bold red]error  [/bold red]"
 
     return styled
-
-
-def show_structural(path: Path, findings: list[tuple[Severity, str]]) -> None:
-    """Table of the structural checks of a file obspy cannot read
-
-    Args:
-        path: the file.
-        findings: severity and message of each check.
-
-
-    """
-    table = Table(title=f"Doctor: {escape(str(path))} (structure)")
-    table.add_column("severity")
-    table.add_column("finding")
-    for severity, message in findings:
-        table.add_row(style(severity), escape(message))
-    console.print(table)
