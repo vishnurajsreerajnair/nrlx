@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 
 from nrlx.core.matching import compare, split_condition
+from nrlx.schema.response import Source
 
 # subject of the StationXML comment saying what a channel is built from
 PROVENANCE_SUBJECT = "nrlx"
@@ -24,23 +25,49 @@ RATE_KEY = "rate"
 UNITS_KEY = "units"
 
 
-def provenance_text(version: str, parts: list[tuple[str, str]]) -> str:
+def provenance_text(version: str, source: Source, parts: list[tuple[str, str]]) -> str:
     """Text of the provenance comment of a channel built by nrlx
 
     Args:
         version: version of nrlx.
+        source: where the NRL parts come from, service or local.
         parts: element and instconfig of each part, in the order of the signal;
             GIVEN_PART for a part given as a response.
 
     Returns:
-        for example "built by nrlx 0.3.0: sensor=sensor_A datalogger=file".
+        for example "built by nrlx 0.3.0 (service): sensor=sensor_A
+        datalogger=file".
 
 
     """
     built = " ".join(f"{element}={instconfig}" for element, instconfig in parts)
-    text = f"built by nrlx {version}: {built}"
+    text = f"built by nrlx {version} ({source}): {built}"
 
     return text
+
+
+def read_source(text: str) -> Source | None:
+    """Source of the NRL parts of a provenance comment written by provenance_text
+
+    Args:
+        text: value of the comment.
+
+    Returns:
+        service or local; None if the text is not a provenance, or was written
+        before the source was recorded.
+
+
+    """
+    head, colon, _ = text.partition(": ")
+    source: Source | None = None
+    if colon and head.startswith("built by nrlx "):
+        match head.split()[-1]:
+            case "(service)":
+                source = "service"
+            case "(local)":
+                source = "local"
+
+    return source
 
 
 def read_provenance(text: str) -> list[tuple[str, str]]:

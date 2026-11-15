@@ -312,6 +312,19 @@ def test_response_of_a_local_part_alone_notes_what_it_keeps(
     assert "kept as received" in notes[0]
 
 
+def test_response_records_the_local_source(catalog, prefixes, tmp_path):
+    tree = tmp_path / "NRL"
+    part = tree / "sensor" / "Streckeisen" / "STS-2_EG3_SG1500_LP120_STgroundVel.xml"
+    part.parent.mkdir(parents=True)
+    part.write_bytes((DATA_DIR / "nrl_part_sts2.xml").read_bytes())
+    nrl = Nrlx(catalog=catalog, prefixes=prefixes, local_tree=tree)
+
+    inventory, _ = nrl.response(sensor=["STS-2", "SG=1500"], source="local")
+
+    [comment] = inventory[0][0][0].comments
+    assert comment.value.startswith(f"built by nrlx {__version__} (local): sensor=")
+
+
 def test_response_says_what_built_each_channel(nrl, fake_service, make_stationxml):
     fake_service.contents["combine"] = make_stationxml("ZZZ")
 
@@ -325,7 +338,8 @@ def test_response_says_what_built_each_channel(nrl, fake_service, make_stationxm
         ["nrlx"],
     ]
     assert comments[0][0].value == (
-        f"built by nrlx {__version__}: sensor={SENSOR} datalogger={DATALOGGER}"
+        f"built by nrlx {__version__} (service): sensor={SENSOR} "
+        f"datalogger={DATALOGGER}"
     )
 
 
@@ -337,6 +351,65 @@ def test_response_says_file_for_a_part_from_a_file(nrl, fake_service):
 
     [comment] = inventory[0][0][0].comments
     assert comment.value.endswith(f": sensor=file datalogger={DATALOGGER}")
+
+
+def test_nominal_rebuilds_the_parts_of_the_comment(nrl, fake_service, make_stationxml):
+    fake_service.contents["combine"] = make_stationxml("ZZZ")
+    built, _ = nrl.response(sensor=["STS-2", "SG=1500"], datalogger=["Q330"])
+
+    nominal, built_from = nrl.nominal(built[0][0][0])
+
+    assert nominal is not None
+    assert built_from == f"sensor={SENSOR} datalogger={DATALOGGER} (service)"
+    # the same request as the build
+    assert fake_service.requests[1].params == fake_service.requests[0].params
+
+
+def test_nominal_takes_the_keys_given_over_the_comment(
+    nrl, fake_service, make_stationxml
+):
+    fake_service.contents["combine"] = make_stationxml("ZZZ")
+    built, _ = nrl.response(sensor=["STS-2", "SG=1500"], datalogger=["Q330"])
+
+    _, built_from = nrl.nominal(built[0][0][0], sensor=["STS-2", "SG=1500"])
+
+    assert built_from == "sensor=STS-2 SG=1500 (service)"
+
+
+def test_nominal_takes_the_source_of_the_comment(catalog, prefixes, tmp_path):
+    tree = tmp_path / "NRL"
+    part = tree / "sensor" / "Streckeisen" / "STS-2_EG3_SG1500_LP120_STgroundVel.xml"
+    part.parent.mkdir(parents=True)
+    part.write_bytes((DATA_DIR / "nrl_part_sts2.xml").read_bytes())
+    nrl = Nrlx(catalog=catalog, prefixes=prefixes, local_tree=tree)
+    built, _ = nrl.response(sensor=["STS-2", "SG=1500"], source="local")
+
+    nominal, built_from = nrl.nominal(built[0][0][0])
+
+    assert nominal is not None
+    assert built_from == f"sensor={SENSOR} (local)"
+
+
+def test_nominal_without_parts_says_why(nrl, fake_service):
+    channel = obspy.read_inventory(DATA_DIR / "nrl_sts2_q330.xml")[0][0][0]
+    channel.comments = []
+    from_file = obspy.read_inventory(DATA_DIR / "nrl_sts2_q330.xml")[0][0][0]
+    from_file.comments = [
+        obspy.core.inventory.Comment(
+            f"built by nrlx 0.3.0 (service): sensor={SENSOR} datalogger=file",
+            subject="nrlx",
+        )
+    ]
+
+    assert nrl.nominal(channel) == (
+        None,
+        "no NRL parts: give --sensor, --datalogger or --integrated",
+    )
+    assert nrl.nominal(from_file) == (
+        None,
+        "the datalogger came from a file: give its NRL keys",
+    )
+    assert fake_service.requests == []
 
 
 def test_assets_of_the_cache(cache_root, tmp_path):

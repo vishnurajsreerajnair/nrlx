@@ -45,12 +45,13 @@ command, `nrlx response`; the Python API changes as listed below.
   4.9 % up to 3.6 Hz, 28.9 % at 16 Hz). SACPZ refuses, before writing, the
   channels obspy would skip silently: without poles and zeros, or with an input
   other than m, m/s or m/s**2 (a pressure sensor, a polynomial).
-  `nrlx response -o FILE.pz` writes SACPZ too; `nrlx doctor` refuses it for now.
+  `nrlx response -o FILE.pz` writes SACPZ too.
   `io.inventory.read_channels(path, seed_id)` reads every channel of a file or
   those of a SEED id (merging the stations obspy splits when it reads a RESP of
   several channels, so a RESP converts to one station with all its channels), `write_inventory(inventory, path, format)` writes the three
   formats, `io.sacpz.read_sacpz(text)` reads SACPZ (which obspy writes but does
-  not read), and `core.convert` has `output_format` and the amplitudes of the
+  not read: SEED id, zeros, poles, constant, and the rate of its `* SAMPLE RATE`
+  comment or None), and `core.convert` has `output_format` and the amplitudes of the
   check (`pz_amplitude`, `relative_difference`, `check_frequencies`). The tests
   make their dataless SEED at run time, from the RESP of `tests/data`, with
   obspy's `Parser.write_seed`.
@@ -79,8 +80,8 @@ command, `nrlx response`; the Python API changes as listed below.
   `schema.asset.AssetRow`.
 - **Provenance comment**: `Nrlx.response` (and so `nrlx response`) writes on each
   channel a StationXML comment of subject `nrlx` with the instconfigs it was built
-  from, `built by nrlx 0.2.1: sensor=... datalogger=...` (`file` for a part from a
-  file), so that a file added later as an asset keeps its NRL keys. RESP and
+  from and their source, `built by nrlx 0.2.1 (service): sensor=... datalogger=...`
+  (`file` for a part from a file; `core.assets.read_source` reads the source), so that a file added later as an asset keeps its NRL keys. RESP and
   SACPZ have no comments and leave it out. `io.inventory.set_provenance`,
   `stationxml_text`, and `response_difference` (the read-back comparison of
   `verify_written`, also used by the assets).
@@ -92,6 +93,47 @@ command, `nrlx response`; the Python API changes as listed below.
   stated sensitivity differs from the one of the stages by more than 0.1 %
   (`SENSITIVITY_NOTED`; for example an HG-7 on a GaiaCode TAU at 8 sps, stated
   x3.64 what its stages give). The command prints them as the other notes.
+  These rules are in `normalization_values`, `stated_ratio`, `sensor_frequency`
+  and `band_fraction`, which the doctor checks share.
+- **Physical checks of a channel** (doctor tier 2), in `core.doctor`, each a list
+  of `(severity, message)` with the new severity `info` for a check that does not
+  apply:
+  - `check_amplitude`: the stated sensitivity against its stages by evalresp's
+    rules (error beyond 1 %), a missing or non-positive sensitivity (error), and
+    warnings for a normalization factor that does not give its gain, a sensitivity
+    at or above Nyquist or out of the sensor's flat band, and a FIR whose
+    coefficients do not sum to 1.
+  - `check_chains`: errors for stages not numbered 1 to N, a break in the units,
+    a last stage not in counts, a sensitivity in other units than the stages, a
+    digital stage without decimation, and decimations ending at another rate than
+    the channel's. A break in the rate chain is a warning: evalresp takes each
+    stage at its own rate.
+  - `check_poles` / `check_poles_zeros`: errors for unstable poles (analog with a
+    positive real part, digital outside the unit circle), and a warning for a zero
+    on a pole. `check_sacpz` adds the CONSTANT.
+  - `check_codes`: warnings for a band code that does not fit the sample rate and
+    an instrument code that does not fit the input units (H, L, P in m/s, N in
+    m/s**2, D in Pa).
+
+  `guess_format(content)` picks the tier 1 checks (XML or RESP) for a file obspy
+  cannot read.
+
+  On the whole NRL v2 they find 18 sensor files with poles of the wrong sign
+  (REFTEK RT131, RSensors CME, Guralp CMG-5T, ...), 448 datalogger files with an
+  analog DC filter typed as a Z transform (DTCC, MagseisFairfield), 96 with the
+  reverse (SeismicSource DAQ3), and 1,459 whose rates do not chain.
+- **A channel against its NRL nominal** (doctor tier 3). `Nrlx.nominal(channel,
+  sensor=, datalogger=, integrated=, source=)` builds the nominal of the parts
+  given, else of the instconfigs of the provenance comment, from the comment's
+  source (`--source` overrides; service by default); it returns None and the
+  reason without parts or for a part from a file. In `core.doctor`,
+  `check_nominal_kind` gives errors for what no calibration changes (input units,
+  output rate, the kind and number of the sensor's poles and zeros),
+  `check_nominal_curve` warnings beyond 1 % of amplitude or 1 degree of phase in
+  band (a calibration can explain them; a pole of the wrong sign shows as about
+  180 degrees), and `stage_changes` names the stages that differ (type, gain,
+  poles and zeros, coefficients, decimation). `io.inventory.evalresp_values`
+  gives the complex response by evalresp; `evalresp_curve` is its amplitude.
 - **Local copy of the NRL**, `nrlx local sync|status|remove`. `sync` downloads
   the catalog, the code table and the zip of the whole NRL (`/combine` with
   `instconfig=full_NRL_v2_zip`, about 300 MB, streamed to disk by
@@ -240,8 +282,7 @@ command, `nrlx response`; the Python API changes as listed below.
   BuiltResponse, Catalog, ResponseFormat` keeps working.
 - `ResponseFormat` is a `Literal["resp", "stationxml", "sacpz"]` instead of an
   enum: pass `format="resp"` instead of `ResponseFormat.RESP`. `stationxml-resp`, left from
-  `nrlx build`, is removed: `nrlx doctor --format` takes `resp` or `stationxml`,
-  as `nrlx response` does.
+  `nrlx build`, is removed.
 - `Catalog` is the decoded JSON tree: `get_elements`, `get_manufacturers`,
   `get_models` and `get_configurations` return the nodes with their parents, for
   example `(element, manufacturer, model, configuration)`, and `resolve` returns
@@ -254,6 +295,15 @@ command, `nrlx response`; the Python API changes as listed below.
   `timeout` instead of an `NRLClient`.
 - The doctor checks are functions, `check_response(content, format)` returning
   `(severity, message)` pairs, instead of `HealthReport.from_file`.
+- **`nrlx doctor` checks the channels**, no longer only the structure of the
+  file: it reads any file obspy reads (`FILE#NET.STA.LOC.CHA` for one channel),
+  or SACPZ, and runs the tier 2 checks and the comparison with the NRL nominal
+  (`--sensor`, `--datalogger`, `--integrated`, `--source`, `--no-nominal`,
+  `--cache-root`, `--base-url`), in a table of one row per channel and five
+  groups, then a line per warning or error (`--all` for every check). The
+  structural checks remain for a file obspy cannot read, picked by
+  `core.doctor.guess_format`. `--format` and `core.doctor.infer_format` are
+  removed: the reader tells the format.
 - **Removed, replaced by `nrlx response`**: `nrlx browse` (summary, elements,
   manufacturers, models, configs, show) and `nrlx build`, with its
   `--sensor-instconfig`/`--sensor-keys` style flags, `--merge-channels` (one file

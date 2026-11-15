@@ -326,7 +326,7 @@ def test_sacpz_constant_is_right_when_the_sensitivity_is_not_at_a0(tmp_path):
     response = inventory[0][0][0].response
     pz = write_inventory(inventory, tmp_path / "geophone.pz", "sacpz")
 
-    [(_, zeros, poles, constant)] = read_sacpz(pz.read_text())
+    [(_, zeros, poles, constant, _)] = read_sacpz(pz.read_text())
 
     frequencies = [0.1, 1.0, 4.5, 10.0, 100.0]
     whole = response.get_evalresp_response_for_frequencies(frequencies, output="DISP")

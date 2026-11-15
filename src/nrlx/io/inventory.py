@@ -340,7 +340,7 @@ def verify_written(
             blocks = read_sacpz(path.read_text())
             if [seedid for seedid, *_ in blocks] != [seedid for seedid, _ in written]:
                 raise ValueError(f"{path} does not hold the channels written.")
-            for (seedid, cha), (_, zeros, poles, constant) in zip(
+            for (seedid, cha), (_, zeros, poles, constant, _) in zip(
                 written, blocks, strict=True
             ):
                 response = cha.response
@@ -497,10 +497,27 @@ def evalresp_curve(response: Response, frequencies: list[float]) -> list[float]:
 
 
     """
-    values = response.get_evalresp_response_for_frequencies(frequencies, output="DEF")
-    curve = [float(abs(value)) for value in values]
+    curve = [abs(value) for value in evalresp_values(response, frequencies)]
 
     return curve
+
+
+def evalresp_values(response: Response, frequencies: list[float]) -> list[complex]:
+    """Complex response by obspy's evalresp, in its own units
+
+    Args:
+        response: response with a sensitivity.
+        frequencies: frequencies in Hz.
+
+    Returns:
+        the value at each frequency.
+
+
+    """
+    values = response.get_evalresp_response_for_frequencies(frequencies, output="DEF")
+    complexes = [complex(value) for value in values]
+
+    return complexes
 
 
 def placeholder_inventory(response: Response, sample_rate: float | None) -> Inventory:

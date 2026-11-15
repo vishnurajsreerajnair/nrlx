@@ -8,9 +8,16 @@ from pathlib import Path
 
 import msgspec
 from obspy import Inventory
+from obspy.core.inventory import Channel
 from obspy.core.inventory.response import Response
 
-from nrlx.core.assets import GIVEN_PART, provenance_text
+from nrlx.core.assets import (
+    GIVEN_PART,
+    PROVENANCE_SUBJECT,
+    provenance_text,
+    read_provenance,
+    read_source,
+)
 from nrlx.core.combine import (
     cascade_instconfig,
     combine_params,
@@ -461,9 +468,103 @@ class Nrlx(msgspec.Struct, frozen=True, kw_only=True):
             ]
             if part is not None or element in found
         ]
-        inventory = set_provenance(inventory, provenance_text(__version__, parts))
+        provenance = provenance_text(__version__, request.source, parts)
+        inventory = set_provenance(inventory, provenance)
 
         return inventory, notes
+
+    def nominal(
+        self,
+        channel: Channel,
+        *,
+        sensor: list[str] | None = None,
+        datalogger: list[str] | None = None,
+        integrated: list[str] | None = None,
+        source: Source | None = None,
+    ) -> tuple[Channel | None, str]:
+        """NRL nominal of a channel: built from the parts given, else from those of
+        its provenance comment, with the source of the comment unless one is given
+
+        Args:
+            channel: channel checked.
+            sensor: keys of the sensor, None to take the comment's parts.
+            datalogger: keys of the datalogger, None to take the comment's parts.
+            integrated: keys of the integrated instrument, None to take the
+                comment's parts.
+            source: service or local, None for the comment's (service without
+                one).
+
+        Returns:
+            the nominal channel and what it is built from ("sensor=...
+            datalogger=... (service)"); None and the reason when there is nothing
+            to build: no parts given and no comment, or a part of the comment from
+            a file.
+
+        Raises:
+            LookupError: if keys match no configuration or several.
+            ValueError: see Catalog.resolve.
+            FileNotFoundError: if the local copy, or the file of a part in it, is
+                missing.
+            httpx.HTTPError: if the service cannot be reached or answers with an
+                error status.
+
+
+        """
+        # the first provenance comment of the channel
+        comment = next(
+            (
+                comment.value
+                for comment in channel.comments
+                if comment.subject == PROVENANCE_SUBJECT
+                and read_provenance(comment.value)
+            ),
+            None,
+        )
+
+        # the parts given replace those of the comment, each instconfig a key
+        given = [
+            (element, keys)
+            for element, keys in [
+                ("sensor", sensor),
+                ("datalogger", datalogger),
+                ("integrated", integrated),
+            ]
+            if keys is not None
+        ]
+        commented = [
+            (element, [instconfig])
+            for element, instconfig in (
+                read_provenance(comment) if comment is not None else []
+            )
+        ]
+        parts = given or commented
+        built_from = (
+            source
+            or (read_source(comment) if comment is not None and not given else None)
+            or "service"
+        )
+        files = [element for element, keys in parts if keys == [GIVEN_PART]]
+
+        # nothing to build, a part the NRL does not hold, or the nominal
+        nominal_channel: Channel | None = None
+        if not parts:
+            reason = "no NRL parts: give --sensor, --datalogger or --integrated"
+        elif files:
+            reason = f"the {' and '.join(files)} came from a file: give its NRL keys"
+        else:
+            found = dict(parts)
+            inventory, _ = self.response(
+                sensor=found.get("sensor"),
+                datalogger=found.get("datalogger"),
+                integrated=found.get("integrated"),
+                soh=found.get("soh"),
+                source=built_from,
+            )
+            nominal_channel = inventory[0][0][0]
+            named = " ".join(f"{element}={' '.join(keys)}" for element, keys in parts)
+            reason = f"{named} ({built_from})"
+
+        return nominal_channel, reason
 
     def part(self, instconfig: str, source: Source = "service") -> Response:
         """Response of a single part of the NRL, from the service or the local copy

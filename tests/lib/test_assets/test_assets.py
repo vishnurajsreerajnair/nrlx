@@ -11,6 +11,7 @@ from nrlx.core.assets import (
     column_holds,
     provenance_text,
     read_provenance,
+    read_source,
     split_asset_keys,
 )
 from nrlx.io.assets import read_rows
@@ -44,11 +45,27 @@ def tellus(station: str):
 
 
 def test_provenance_reads_back_its_parts():
-    text = provenance_text("0.3.0", [("sensor", SENSOR), ("datalogger", "file")])
+    text = provenance_text(
+        "0.3.0", "service", [("sensor", SENSOR), ("datalogger", "file")]
+    )
 
-    assert text == f"built by nrlx 0.3.0: sensor={SENSOR} datalogger=file"
+    assert text == f"built by nrlx 0.3.0 (service): sensor={SENSOR} datalogger=file"
     assert read_provenance(text) == [("sensor", SENSOR), ("datalogger", "file")]
     assert read_provenance("Calibrated on 2024-05-01: gain=1498") == []
+
+
+@pytest.mark.parametrize(
+    ("text", "source"),
+    [
+        (f"built by nrlx 0.3.0 (service): sensor={SENSOR}", "service"),
+        (f"built by nrlx 0.3.0 (local): sensor={SENSOR}", "local"),
+        # written before the source was recorded
+        (f"built by nrlx 0.3.0: sensor={SENSOR}", None),
+        ("Calibrated on 2024-05-01 (local): gain=1498", None),
+    ],
+)
+def test_read_source_gives_the_source_or_none(text, source):
+    assert read_source(text) == source
 
 
 @pytest.mark.parametrize("uid", ["T13", "EB696", "SN-1234_a.b"])
@@ -97,7 +114,9 @@ def test_add_numbers_the_versions_of_a_uid_across_variants(assets, station_xml):
 def test_add_reads_the_parts_from_the_provenance(assets, station_xml):
     inventory = set_provenance(
         read_channels(station_xml),
-        provenance_text("0.3.0", [("sensor", SENSOR), ("datalogger", DATALOGGER)]),
+        provenance_text(
+            "0.3.0", "service", [("sensor", SENSOR), ("datalogger", DATALOGGER)]
+        ),
     )
 
     row = assets.add(inventory, "EB696")
@@ -179,7 +198,9 @@ def test_select_asks_a_key_between_variants(assets, station_xml):
 def test_select_by_the_keys_of_the_nrl_parts(assets, station_xml):
     marked = set_provenance(
         read_channels(station_xml),
-        provenance_text("0.3.0", [("sensor", SENSOR), ("datalogger", DATALOGGER)]),
+        provenance_text(
+            "0.3.0", "service", [("sensor", SENSOR), ("datalogger", DATALOGGER)]
+        ),
     )
     assets.add(marked)
     assets.add(tellus("T13"))

@@ -25,7 +25,7 @@ nrlx response --sensor luni,tellus,LP=1 \
   --network XY --station TST --location 00 --channels HHZ,HHN,HHE \
   -o station.xml                            # a real StationXML file
 
-nrlx doctor station.xml                     # sanity-check what you wrote
+nrlx doctor station.xml                     # check it, and compare it with the NRL
 ```
 
 Without `-o`, `nrlx response` only shows: the matches of each part and the
@@ -71,7 +71,7 @@ builds are obspy objects in memory (see [Python library](#python-library)).
 | `nrlx convert <file> -o <out>` | Convert a response file to StationXML, RESP or SACPZ, read back and checked. |
 | `nrlx assets add\|list\|get\|deprecate\|delete\|export\|import` | Keep the responses you build, by UID and versioned, in a database you can share. |
 | `nrlx local sync\|status\|remove` | Keep a local copy of the whole NRL, for `nrlx response --source local`. |
-| `nrlx doctor <file>` | Run structural health checks on a saved response file. |
+| `nrlx doctor <file>` | Check each channel of a response file (amplitude, units and rates, poles, codes) and compare it with its NRL nominal. |
 
 Run `nrlx <command> --help` for the full option list.
 
@@ -224,13 +224,49 @@ nrlx assets import share/                 # or another .sqlite
   the keys leave several variants it lists them. `--version N` gets any version,
   deprecated or not. The file written is read back and checked, as by `convert`.
 - `nrlx response` writes a comment on each StationXML channel with the
-  instconfigs it was built from (`built by nrlx 0.3.0: sensor=... datalogger=...`),
+  instconfigs it was built from (`built by nrlx 0.3.0 (service): sensor=... datalogger=...`, or `(local)`),
   so the NRL keys also pick the files added later with `assets add`.
 - The database is `assets.sqlite` in the cache folder (`--db` for another).
   `nrlx local remove` never touches it, but deleting the cache folder by hand
   does: export it to keep a copy. To share, export and import rather than
   writing to one database on a network drive, where SQLite's locking is not
   reliable.
+
+### Checking a file
+
+```bash
+nrlx doctor station.xml                       # a file nrlx built: compared with its NRL parts
+nrlx doctor vendor.resp --sensor STS-2,SG=1500 --datalogger Q330,FR=100
+nrlx doctor "station.xml#XY.MYSTN.00.BHZ" --all
+nrlx doctor station.pz                        # SACPZ: poles, constant, codes
+```
+
+- Any file obspy reads (StationXML, RESP, dataless SEED, XSEED, SC3ML), or SACPZ.
+  A table gives each channel ok, or its warnings and errors, in five groups;
+  below it a line per warning or error (`--all`: every check). An error exits 1.
+- **amplitude**: the stated sensitivity against what its stages give by the
+  rules of evalresp (an error beyond 1 %: `remove_response` and
+  `remove_sensitivity` would disagree), and warnings for a normalization factor
+  that does not give its stage gain, a sensitivity at or above Nyquist or out of
+  the sensor's flat band, a FIR whose coefficients do not sum to 1.
+- **chains**: stages numbered 1 to N, units that follow from stage to stage and
+  end in counts, decimations that chain and end at the channel's rate (a break
+  in the rate chain is a warning, as evalresp takes each stage at its own rate).
+- **poles**: an analog pole with a positive real part, or a digital one outside
+  the unit circle, is an error: the amplitude is the same, but the phase is
+  wrong. On the whole NRL v2 this finds 18 sensor files with poles of the wrong
+  sign and 448 datalogger files with an analog filter typed as a Z transform.
+- **codes**: the band code for the sample rate and the instrument code for the
+  input units (SEED norm), warnings.
+- **nominal**: the channel against the NRL nominal of its parts, from the
+  provenance comment of a StationXML built by nrlx, or from `--sensor`,
+  `--datalogger`, `--integrated` for any other file. A different input unit,
+  rate or sensor poles and zeros is an error; amplitude beyond 1 % or phase
+  beyond 1 degree a warning (a calibration can explain it), with the stages that
+  differ. The nominal comes from the source of the comment (`--source` to
+  change; service by default), one request per distinct nominal;
+  `--no-nominal` skips it. Without a synced catalog the other checks still run.
+- A file obspy cannot read gets the structural checks (XML or RESP) that say why.
 
 ## Python library
 
@@ -290,9 +326,11 @@ offline.
 Working end to end against the live NRL v2 service (released 0.2.x on PyPI; 0.1.0
 was an early skeleton, yanked): finding by keys and conditions, sensor and
 datalogger combination (also with your own sensor or datalogger files),
-StationXML and RESP writing with any channel codes, and the structural `doctor`
-check, and a local copy of the NRL to build offline. Planned next: format
-conversion, deeper doctor checks and local sensor assets. See [CHANGELOG.md](CHANGELOG.md) for details.
+StationXML, RESP and SACPZ writing with any channel codes, a local copy of the
+NRL to build offline, conversion between formats, assets, and `doctor` with
+physical checks and the comparison with the NRL nominal. Planned next: finding
+the NRL parts of a file that does not say them (reverse lookup). See
+[CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Note for developers
 
@@ -311,8 +349,8 @@ importing only the ones below it:
 Library code raises built-in exceptions, and each command catches the ones it
 can get. [CLAUDE.md](CLAUDE.md) lists the code conventions.
 
-Not yet: `nrlx doctor` does not check SACPZ files, and nrlx does not read
-SACPZ as an input (obspy cannot). Issues and PRs welcome.
+Not yet: nrlx does not read SACPZ as an input to convert or build (obspy
+cannot; `nrlx doctor` reads it with its own reader). Issues and PRs welcome.
 
 ## Disclaimer
 

@@ -298,15 +298,7 @@ def sensitivity_frequency(
 
 
     """
-    first = stages[0]
-    frequency = float(
-        (
-            first.normalization_frequency
-            if isinstance(first, PolesZerosResponseStage)
-            else first.stage_gain_frequency
-        )
-        or 1.0
-    )
+    frequency = sensor_frequency(stages[0])
 
     # the sensor's frequency can be above what the channel passes
     notes = list()
@@ -319,9 +311,7 @@ def sensitivity_frequency(
 
         # the channel may see none of the sensor's flat band (a geophone on a slow
         # channel): any frequency it records is in the roll-off
-        fraction = response_amplitude(sensor, capped) / response_amplitude(
-            sensor, frequency
-        )
+        fraction = band_fraction(sensor, capped)
         if fraction < FLAT_BAND_FRACTION:
             notes.append(
                 f"the sensor gives {fraction * 100:.3g}% of its gain at {capped:g} "
@@ -422,38 +412,143 @@ def received_notes(response: Response) -> list[str]:
     notes = list()
 
     # each poles and zeros stage worth its gain at its normalization frequency
-    for stage in response.response_stages:
-        if isinstance(stage, PolesZerosResponseStage):
-            frequency = float(stage.normalization_frequency)
-            value = abs(transfer(stage, frequency))
-            if value and abs(value - 1.0) > NORMALIZATION_NOTED:
-                notes.append(
-                    f"stage {stage.stage_sequence_number}: the normalization factor "
-                    f"gives x{value:.6g} of its gain {float(stage.stage_gain):g} at "
-                    f"{frequency:g} Hz, kept as received (obspy lets the gain win "
-                    f"unless the sensitivity is at {frequency:g} Hz); a combination "
-                    "by nrlx corrects it"
-                )
+    stages = list(response.response_stages)
+    gains = {int(stage.stage_sequence_number): stage.stage_gain for stage in stages}
+    for number, frequency, value in normalization_values(stages):
+        notes.append(
+            f"stage {number}: the normalization factor gives x{value:.6g} of its "
+            f"gain {float(gains[number]):g} at {frequency:g} Hz, kept as received "
+            f"(obspy lets the gain win unless the sensitivity is at {frequency:g} "
+            "Hz); a combination by nrlx corrects it"
+        )
 
     # the stated sensitivity against the one of the stages
     sensitivity = response.instrument_sensitivity
-    computed = None
-    if sensitivity is not None and response.response_stages:
-        try:
-            computed = response_amplitude(
-                response.response_stages, float(sensitivity.frequency)
-            )
-        except ValueError as err:
-            notes.append(f"the sensitivity cannot be checked: {err}")
-    if sensitivity is not None and computed:
-        ratio = float(sensitivity.value) / computed
-        if abs(ratio - 1.0) > SENSITIVITY_NOTED:
-            notes.append(
-                f"the stated sensitivity {float(sensitivity.value):g} at "
-                f"{float(sensitivity.frequency):g} Hz is x{ratio:.4g} what the stages "
-                f"give ({computed:.6g}): remove_response uses the stages, "
-                "remove_sensitivity the stated value; a combination by nrlx "
-                "recomputes it"
-            )
+    try:
+        stated = stated_ratio(response)
+    except ValueError as err:
+        notes.append(f"the sensitivity cannot be checked: {err}")
+    else:
+        match stated:
+            case computed, ratio if (
+                sensitivity is not None and abs(ratio - 1.0) > SENSITIVITY_NOTED
+            ):
+                notes.append(
+                    f"the stated sensitivity {float(sensitivity.value):g} at "
+                    f"{float(sensitivity.frequency):g} Hz is x{ratio:.4g} what the "
+                    f"stages give ({computed:.6g}): remove_response uses the stages, "
+                    "remove_sensitivity the stated value; a combination by nrlx "
+                    "recomputes it"
+                )
+            case _:
+                pass
 
     return notes
+
+
+def normalization_values(stages: list[ResponseStage]) -> list[tuple[int, float, float]]:
+    """Poles and zeros stages that their normalization factor does not normalize
+
+    Args:
+        stages: the stages.
+
+    Returns:
+        the number, the normalization frequency and |A0 x T(fn)| of each poles and
+        zeros stage more than NORMALIZATION_NOTED from 1 (a 0 is not a factor).
+
+
+    """
+    values = [
+        (
+            int(stage.stage_sequence_number),
+            float(stage.normalization_frequency),
+            abs(transfer(stage, float(stage.normalization_frequency))),
+        )
+        for stage in stages
+        if isinstance(stage, PolesZerosResponseStage)
+    ]
+    off = [
+        (number, frequency, value)
+        for number, frequency, value in values
+        if value and abs(value - 1.0) > NORMALIZATION_NOTED
+    ]
+
+    return off
+
+
+def stated_ratio(response: Response) -> tuple[float, float] | None:
+    """What the stages of a response give at the frequency of its stated
+    sensitivity, by the rules of evalresp, and the stated sensitivity over it
+
+    Args:
+        response: the response.
+
+    Returns:
+        what the stages give and the ratio; None without a sensitivity or stages,
+        or when the stages give 0.
+
+    Raises:
+        ValueError: see core.gain.transfer.
+
+
+    """
+    sensitivity = response.instrument_sensitivity
+    computed = (
+        response_amplitude(response.response_stages, float(sensitivity.frequency))
+        if sensitivity is not None and response.response_stages
+        else 0.0
+    )
+    ratio = (
+        (computed, float(sensitivity.value) / computed)
+        if sensitivity is not None and computed
+        else None
+    )
+
+    return ratio
+
+
+def sensor_frequency(stage: ResponseStage) -> float:
+    """Frequency of the gain of a sensor, from its first stage
+
+    Args:
+        stage: first stage of the sensor.
+
+    Returns:
+        the normalization frequency of a poles and zeros stage, else the gain
+        frequency; 1 Hz when missing.
+
+
+    """
+    frequency = float(
+        (
+            stage.normalization_frequency
+            if isinstance(stage, PolesZerosResponseStage)
+            else stage.stage_gain_frequency
+        )
+        or 1.0
+    )
+
+    return frequency
+
+
+def band_fraction(sensor: list[ResponseStage], frequency: float) -> float:
+    """Fraction of its gain a sensor gives at a frequency
+
+    Args:
+        sensor: the stages of the sensor.
+        frequency: frequency in Hz.
+
+    Returns:
+        the amplitude at the frequency over the amplitude at sensor_frequency.
+
+    Raises:
+        ValueError: see core.gain.transfer.
+
+
+    """
+    reference = sensor_frequency(sensor[0])
+    fraction = response_amplitude(sensor, frequency) / response_amplitude(
+        sensor, reference
+    )
+
+    return fraction
