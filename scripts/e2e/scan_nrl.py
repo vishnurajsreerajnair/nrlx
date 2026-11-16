@@ -23,7 +23,7 @@ import msgspec
 import obspy
 from common import CASE_ERRORS
 
-from nrlx.core.doctor import check_amplitude, check_chains, check_poles
+from nrlx.core.doctor import check_channel
 
 # the elements of the NRL scanned, the folders of its tree
 ELEMENTS = ["sensor", "datalogger", "integrated"]
@@ -118,11 +118,7 @@ def main() -> None:
                 scan.unreadable.append((name, f"{type(err).__name__}: {err}"))
                 continue
             scan.files[element] = scan.files.get(element, 0) + 1
-            groups = [
-                ("amplitude", check_amplitude(response, None)),
-                ("chains", check_chains(response, None)),
-                ("poles", check_poles(response)),
-            ]
+            # no channel code in a part of the NRL: no codes checked
             scan.findings += [
                 ScanFinding(
                     file=name,
@@ -130,8 +126,7 @@ def main() -> None:
                     severity=severity,
                     message=message,
                 )
-                for group, findings in groups
-                for severity, message in findings
+                for group, severity, message in check_channel(response, None, None)
                 if severity in ("warning", "error")
             ]
     (arguments.out / "scan.json").write_bytes(

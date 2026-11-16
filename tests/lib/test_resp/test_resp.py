@@ -244,3 +244,48 @@ def test_numbers_keep_every_digit(value):
 def test_resp_time():
     assert resp_time(UTCDateTime(1970, 1, 1)) == "1970,001,00:00:00"
     assert resp_time(None) == "No Ending Time"
+
+
+def test_resp_time_keeps_the_ten_thousandths_of_a_second():
+    assert resp_time(UTCDateTime(2022, 4, 22, 5, 53, 33, 749000)) == (
+        "2022,112,05:53:33.7490"
+    )
+    assert resp_time(UTCDateTime(2022, 4, 22, 5, 53, 33, 50)) == "2022,112,05:53:33"
+
+
+def test_resp_reads_back_a_start_with_a_fraction_of_a_second():
+    inventory = one_channel(Response(response_stages=[sensor(1), adc(2)]))
+    inventory[0][0][0].start_date = UTCDateTime(2022, 4, 22, 5, 53, 33, 749000)
+
+    back = read_resp(write_resp(inventory))
+
+    assert back[0][0][0].start_date == UTCDateTime(2022, 4, 22, 5, 53, 33, 749000)
+
+
+def test_resp_leaves_out_a_sensitivity_without_value():
+    response = Response(
+        instrument_sensitivity=InstrumentSensitivity(None, None, "M/S", "COUNTS"),
+        response_stages=[sensor(1), adc(2)],
+    )
+
+    text = write_resp(one_channel(response))
+
+    # the gains of stages 1 and 2, no stage 0
+    assert text.count("B058F03") == 2
+
+
+def test_resp_leaves_out_the_gain_of_a_stage_without_one():
+    first = sensor(1)
+    first.stage_gain = None
+    inventory = one_channel(
+        Response(
+            instrument_sensitivity=InstrumentSensitivity(1.0, 1.0, "M/S", "COUNTS"),
+            response_stages=[first, adc(2)],
+        )
+    )
+
+    text = write_resp(inventory)
+
+    # the gains of stage 2 and of the channel, none for stage 1
+    assert text.count("B058F03") == 2
+    assert np.allclose(curve(read_resp(text)), curve(inventory))

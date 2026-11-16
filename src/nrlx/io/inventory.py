@@ -15,6 +15,7 @@ from obspy.core.inventory.response import (
     PolynomialResponseStage,
     Response,
 )
+from obspy.core.util.obspy_types import ObsPyException
 
 from nrlx.core.assets import PROVENANCE_SUBJECT
 from nrlx.core.combine import output_rate
@@ -76,7 +77,7 @@ def read_channels(path: Path, seed_id: str | None = None) -> Inventory:
     Raises:
         OSError: if the file cannot be read.
         ValueError: if obspy cannot read the format.
-        LookupError: if no channel has the SEED id.
+        LookupError: if the file has no channel, or none has the SEED id.
 
 
     """
@@ -114,6 +115,8 @@ def read_channels(path: Path, seed_id: str | None = None) -> Inventory:
             for cha in sta
         }
     )
+    if not ids:
+        raise LookupError(f"No channel in {path}.")
     if seed_id is not None:
         for net in inventory:
             for sta in net:
@@ -213,12 +216,12 @@ def write_inventory(
 ) -> Path:
     """Write the responses of an inventory in a format
 
-    StationXML and SACPZ by obspy, RESP by write_resp. SACPZ holds the channels
-    with poles and zeros and an input in m, m/s or m/s**2 only: obspy would skip
-    the others, so they are refused before writing. Its constant is A0 times the
-    overall sensitivity (rdseed, IRIS and obspy), right only when A0 normalizes
-    the poles and zeros at the frequency of the sensitivity: the first poles and
-    zeros stage of a copy is normalized there before obspy writes it.
+    StationXML and SACPZ by obspy, RESP by write_resp. The channels the format
+    cannot hold (see refusal) are refused before writing. The SACPZ constant is
+    A0 times the overall sensitivity (rdseed, IRIS and obspy), right only when
+    A0 normalizes the poles and zeros at the frequency of the sensitivity: the
+    first poles and zeros stage of a copy is normalized there before obspy
+    writes it.
 
     Args:
         inventory: inventory of responses.
@@ -229,7 +232,7 @@ def write_inventory(
         the file written.
 
     Raises:
-        ValueError: if a channel has no response, or SACPZ cannot hold it.
+        ValueError: if the format cannot hold a channel.
         OSError: if the file cannot be written.
 
 
@@ -240,41 +243,17 @@ def write_inventory(
         for sta in net
         for cha in sta
     ]
-    missing = [seedid for seedid, cha in channels if cha.response is None]
-    if missing:
-        raise ValueError(f"No response to write for {', '.join(missing)}.")
+    reasons = [(seedid, refusal(cha, fileformat)) for seedid, cha in channels]
+    refused = [(seedid, reason) for seedid, reason in reasons if reason]
+    if refused:
+        listed = "; ".join(f"{seedid}: {reason}" for seedid, reason in refused)
+        raise ValueError(f"Cannot write {fileformat}: {listed}.")
     match fileformat:
         case "stationxml":
             inventory.write(str(path), format="STATIONXML")
         case "resp":
             path.write_text(write_resp(inventory))
         case "sacpz":
-            # the first poles and zeros stage of each channel, the one SACPZ keeps
-            firsts = [
-                next(
-                    (
-                        stage
-                        for stage in cha.response.response_stages
-                        if isinstance(stage, PolesZerosResponseStage)
-                    ),
-                    None,
-                )
-                for _, cha in channels
-            ]
-            refused = [
-                seedid
-                for (seedid, cha), first in zip(channels, firsts, strict=True)
-                if cha.response.instrument_sensitivity is None
-                or (cha.response.instrument_sensitivity.input_units or "").upper()
-                not in SACPZ_UNITS
-                or first is None
-                or first.pz_transfer_function_type not in SACPZ_TRANSFER_TYPES
-            ]
-            if refused:
-                raise ValueError(
-                    "SACPZ holds only the channels with analog poles and zeros and an "
-                    f"input in m, m/s or m/s**2: not {', '.join(refused)}."
-                )
             # CONSTANT = A0 x sensitivity: A0 of a copy at the sensitivity frequency
             normalized = inventory.copy()
             for net in normalized:
@@ -287,6 +266,21 @@ def write_inventory(
                             for stage in response.response_stages
                             if isinstance(stage, PolesZerosResponseStage)
                         )
+                        # obspy's writer converts poles and zeros in Hz to rad/s but
+                        # fails on those without uncertainties: converted here, A0
+                        # with them
+                        if first.pz_transfer_function_type == "LAPLACE (HERTZ)":
+                            twopi = 2.0 * math.pi
+                            first.normalization_factor *= twopi ** (
+                                len(first.poles) - len(first.zeros)
+                            )
+                            first.poles = [
+                                complex(pole) * twopi for pole in first.poles
+                            ]
+                            first.zeros = [
+                                complex(zero) * twopi for zero in first.zeros
+                            ]
+                            first.pz_transfer_function_type = "LAPLACE (RADIANS/SECOND)"
                         if frequency:
                             first.normalization_frequency = frequency
                             first.normalization_factor = (
@@ -300,6 +294,100 @@ def write_inventory(
                 normalized.write(str(path), format="SACPZ")
 
     return path
+
+
+def refusal(channel: Channel, fileformat: ResponseFormat) -> str:
+    """Why a format cannot hold a channel
+
+    Every format needs a response. RESP needs a stage, a sensitivity or a
+    polynomial (obspy reads a RESP channel without any as no response), and no
+    stage numbered 0 but a polynomial: RESP keeps 0 for the sensitivity or the
+    polynomial of the channel (obspy reads the latter as a polynomial stage 0).
+    SACPZ needs a sensitivity, analog poles and zeros and an input in m, m/s or
+    m/s**2 (obspy's writer skips the others).
+
+    Args:
+        channel: channel to write.
+        fileformat: stationxml, resp or sacpz.
+
+    Returns:
+        the reason, empty when the format holds the channel.
+
+
+    """
+    response = channel.response
+    reason = ""
+    if response is None:
+        reason = "no response"
+    else:
+        stages = list(response.response_stages)
+        sensitivity = response.instrument_sensitivity
+        stated = sensitivity is not None and bool(sensitivity.value)
+        first = next(
+            (stage for stage in stages if isinstance(stage, PolesZerosResponseStage)),
+            None,
+        )
+        match fileformat:
+            case "resp" if not (
+                stages or stated or response.instrument_polynomial is not None
+            ):
+                reason = "no stage, sensitivity or polynomial for RESP to hold"
+            case "resp" if any(
+                int(stage.stage_sequence_number) == 0
+                and not isinstance(stage, PolynomialResponseStage)
+                for stage in stages
+            ):
+                reason = (
+                    "a stage numbered 0, the number RESP keeps for the sensitivity "
+                    "of the channel"
+                )
+            case "sacpz" if (
+                not stated
+                or (sensitivity.input_units or "").upper() not in SACPZ_UNITS
+                or first is None
+                or first.pz_transfer_function_type not in SACPZ_TRANSFER_TYPES
+            ):
+                reason = (
+                    "SACPZ holds only the channels with a sensitivity, analog poles "
+                    "and zeros and an input in m, m/s or m/s**2"
+                )
+
+    return reason
+
+
+def writable_channels(
+    inventory: Inventory, fileformat: ResponseFormat
+) -> tuple[Inventory, list[tuple[str, str]]]:
+    """The channels of an inventory a format can hold, and those it cannot
+
+    Args:
+        inventory: inventory of responses.
+        fileformat: stationxml, resp or sacpz.
+
+    Returns:
+        a copy with the channels the format holds (the stations and networks
+        without any left out), and the SEED id and the reason of each channel
+        epoch left out (see refusal).
+
+
+    """
+    kept = inventory.copy()
+    skipped = list()
+    for net in kept:
+        for sta in net:
+            held = list()
+            for cha in sta:
+                reason = refusal(cha, fileformat)
+                if reason:
+                    seedid = f"{net.code}.{sta.code}.{cha.location_code}.{cha.code}"
+                    skipped.append((seedid, reason))
+                else:
+                    held.append(cha)
+            sta.channels = held
+        net.stations = [sta for sta in net if sta.channels]
+    kept.networks = [net for net in kept if net.stations]
+
+    return kept, skipped
 
 
 def verify_written(
@@ -394,7 +482,10 @@ def verify_written(
                     before.response, after.response, before.sample_rate
                 )
                 if difference is None:
-                    notes.append(f"{seedid}: no sensitivity, the curve is not checked")
+                    notes.append(
+                        f"{seedid}: no sensitivity, or none evalresp computes: the "
+                        "curve is not checked"
+                    )
                 elif difference > LOSSLESS_TOLERANCE:
                     raise ValueError(
                         f"{path}: {seedid} reads back {difference:.1e} different "
@@ -410,7 +501,8 @@ def response_difference(
     """Largest relative difference between the curves of two responses
 
     A polynomial compares its coefficients: obspy reads the polynomial of
-    StationXML as the one of the channel, and the one of RESP as a stage 0.
+    StationXML as the one of the channel, and the one of RESP as a stage 0, or
+    leaves it out when the RESP has polynomial stages, which are then compared.
 
     Args:
         before: response of reference.
@@ -419,13 +511,25 @@ def response_difference(
 
     Returns:
         the difference at the frequencies of check_frequencies (0 or inf for a
-        polynomial), None when the reference has no sensitivity to compare with.
+        polynomial), None when the reference has no curve to compare with: no
+        sensitivity, or one evalresp cannot compute (no stages, a polynomial of
+        more than 3 coefficients, stages it cannot chain).
+
+    Raises:
+        ValueError: if evalresp computes the reference but not the response
+            compared.
 
 
     """
     polynomial = before.instrument_polynomial
+    sensitivity = before.instrument_sensitivity
     difference: float | None = None
     if polynomial is not None:
+        stated = [
+            list(stage.coefficients)
+            for stage in before.response_stages
+            if isinstance(stage, PolynomialResponseStage)
+        ]
         again = [
             list(stage.coefficients)
             for stage in after.response_stages
@@ -433,14 +537,30 @@ def response_difference(
         ]
         channel_polynomial = after.instrument_polynomial
         if channel_polynomial is not None:
-            again = [list(channel_polynomial.coefficients)]
-        same = again == [list(polynomial.coefficients)]
+            same = list(channel_polynomial.coefficients) == list(
+                polynomial.coefficients
+            )
+        elif stated:
+            same = again == stated
+        else:
+            same = again == [list(polynomial.coefficients)]
         difference = 0.0 if same else math.inf
-    elif before.instrument_sensitivity is not None:
+    elif sensitivity is not None and sensitivity.value:
         frequencies = check_frequencies(sample_rate)
-        difference = relative_difference(
-            evalresp_curve(before, frequencies), evalresp_curve(after, frequencies)
-        )
+        # evalresp refuses some responses: their curve is not compared
+        reference: list[float] | None
+        try:
+            reference = evalresp_curve(before, frequencies)
+        except (ValueError, NotImplementedError, ObsPyException):
+            reference = None
+        if reference is not None:
+            try:
+                compared = evalresp_curve(after, frequencies)
+            except (ValueError, NotImplementedError, ObsPyException) as err:
+                raise ValueError(
+                    f"evalresp cannot compute the response read back: {err}"
+                ) from err
+            difference = relative_difference(reference, compared)
 
     return difference
 

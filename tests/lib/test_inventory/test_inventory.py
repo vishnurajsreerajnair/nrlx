@@ -10,6 +10,7 @@ from obspy import UTCDateTime
 from obspy.core.inventory.response import (
     InstrumentSensitivity,
     PolesZerosResponseStage,
+    PolynomialResponseStage,
     Response,
 )
 
@@ -20,14 +21,20 @@ from nrlx.io.inventory import (
     read_channels,
     read_part,
     read_stationxml,
+    refusal,
+    response_difference,
     set_coordinates,
     split_channels,
     verify_written,
+    writable_channels,
     write_inventory,
 )
 from nrlx.io.sacpz import read_sacpz
 
 DATA_DIR = Path(__file__).parents[2] / "data"
+
+# the formats of write_inventory
+FORMATS = ["stationxml", "resp", "sacpz"]
 
 
 def test_label_channels_copies_the_channel_for_each_code(make_stationxml):
@@ -268,7 +275,9 @@ def test_sacpz_notes_what_it_drops(station_xml, tmp_path):
 def test_sacpz_refuses_a_channel_without_poles_and_zeros(tmp_path):
     inventory = read_channels(DATA_DIR / "nrl_poly.xml")
 
-    with pytest.raises(ValueError, match="SACPZ holds only .* not XX.YY.00.ZZZ"):
+    with pytest.raises(
+        ValueError, match="Cannot write sacpz: XX.YY.00.ZZZ: SACPZ holds only"
+    ):
         write_inventory(inventory, tmp_path / "poly.pz", "sacpz")
     assert not (tmp_path / "poly.pz").exists()
 
@@ -277,7 +286,9 @@ def test_write_inventory_refuses_a_channel_without_response(station_xml, tmp_pat
     inventory = read_channels(station_xml, "XY.T13.00.HHE")
     inventory[0][0][0].response = None
 
-    with pytest.raises(ValueError, match="No response to write for XY.T13.00.HHE"):
+    with pytest.raises(
+        ValueError, match="Cannot write stationxml: XY.T13.00.HHE: no response"
+    ):
         write_inventory(inventory, tmp_path / "station.xml", "stationxml")
 
 
@@ -350,3 +361,121 @@ def test_sacpz_refuses_a_digital_first_poles_and_zeros(tmp_path):
 
     with pytest.raises(ValueError, match="analog poles and zeros"):
         write_inventory(inventory, tmp_path / "digital.pz", "sacpz")
+
+
+def test_read_channels_refuses_a_file_without_channel(tmp_path):
+    inventory = read_channels(DATA_DIR / "nrl_sts2_q330.xml")
+    inventory[0][0].channels = []
+    path = tmp_path / "stations.xml"
+    inventory.write(str(path), format="STATIONXML")
+
+    with pytest.raises(LookupError, match="No channel in"):
+        read_channels(path)
+
+
+def test_refusal_of_each_format(station_xml):
+    channel = read_channels(station_xml, "XY.T13.00.HHZ")[0][0][0]
+
+    assert [refusal(channel, fileformat) for fileformat in FORMATS] == ["", "", ""]
+
+
+def test_resp_refuses_an_empty_response(station_xml):
+    channel = read_channels(station_xml, "XY.T13.00.HHZ")[0][0][0]
+    channel.response = Response()
+
+    assert refusal(channel, "resp") == (
+        "no stage, sensitivity or polynomial for RESP to hold"
+    )
+    assert refusal(channel, "stationxml") == ""
+
+
+def test_resp_refuses_a_stage_numbered_0(station_xml):
+    channel = read_channels(station_xml, "XY.T13.00.HHZ")[0][0][0]
+    channel.response.response_stages[0].stage_sequence_number = 0
+
+    assert refusal(channel, "resp").startswith("a stage numbered 0")
+
+
+def test_writable_channels_keeps_the_others_and_says_why(station_xml):
+    inventory = read_channels(station_xml)
+    inventory[0][0][2].response = None
+
+    kept, skipped = writable_channels(inventory, "resp")
+
+    assert [cha.code for cha in kept[0][0]] == ["HHZ", "HHN"]
+    assert skipped == [("XY.T13.00.HHE", "no response")]
+    assert len(inventory[0][0]) == 3
+
+
+def test_writable_channels_leaves_out_an_empty_station(station_xml):
+    inventory = read_channels(station_xml)
+    for channel in inventory[0][0]:
+        channel.response = None
+
+    kept, skipped = writable_channels(inventory, "stationxml")
+
+    assert kept.networks == []
+    assert len(skipped) == 3
+
+
+def test_response_difference_skips_a_curve_evalresp_cannot_compute():
+    # a sensitivity without stages: evalresp refuses it
+    before = Response(
+        instrument_sensitivity=InstrumentSensitivity(1.0, 1.0, "M", "COUNTS")
+    )
+
+    assert response_difference(before, before, 100.0) is None
+
+
+def test_response_difference_fails_when_only_the_read_back_cannot_be_computed():
+    before = read_channels(DATA_DIR / "nrl_sts2_q330.xml")[0][0][0].response
+    after = Response(
+        instrument_sensitivity=InstrumentSensitivity(1.0, 1.0, "M/S", "COUNTS")
+    )
+
+    with pytest.raises(ValueError, match="evalresp cannot compute the response"):
+        response_difference(before, after, 40.0)
+
+
+def polynomial_stage(coefficients: list[float]) -> PolynomialResponseStage:
+    """A polynomial stage from Pa to V"""
+    return PolynomialResponseStage(
+        1, None, None, "PA", "V", 0.0, 1.0, -1.0, 1.0, 0.0, coefficients
+    )
+
+
+def test_response_difference_compares_the_polynomial_stages_when_resp_drops_it():
+    before = read_channels(DATA_DIR / "nrl_poly.xml")[0][0][0].response
+    before.response_stages = [polynomial_stage([1.0, 2.0])]
+    # obspy's reading of a RESP with polynomial stages: no channel polynomial
+    after = Response(response_stages=[polynomial_stage([1.0, 2.0])])
+
+    assert response_difference(before, after, 1.0) == 0.0
+    after.response_stages[0].coefficients = [1.0, 3.0]
+    assert response_difference(before, after, 1.0) == math.inf
+
+
+def test_sacpz_of_poles_and_zeros_in_hertz_without_uncertainties(station_xml, tmp_path):
+    inventory = read_channels(station_xml, "XY.T13.00.HHZ")
+    first = inventory[0][0][0].response.response_stages[0]
+    twopi = 2.0 * math.pi
+    # the same stage in Hz, its poles and zeros plain complex numbers
+    first.normalization_factor /= twopi ** (len(first.poles) - len(first.zeros))
+    first.poles = [complex(pole) / twopi for pole in first.poles]
+    first.zeros = [complex(zero) / twopi for zero in first.zeros]
+    first.pz_transfer_function_type = "LAPLACE (HERTZ)"
+
+    radians = read_channels(station_xml, "XY.T13.00.HHZ")
+    pz = write_inventory(inventory, tmp_path / "hertz.pz", "sacpz")
+    expected = write_inventory(radians, tmp_path / "radians.pz", "sacpz")
+
+    assert verify_written(inventory, pz, "sacpz") == verify_written(
+        radians, expected, "sacpz"
+    )
+
+
+def test_resp_holds_a_polynomial_stage_numbered_0():
+    # obspy reads the polynomial of a RESP channel as a stage 0
+    channel = read_channels(DATA_DIR / "nrl_poly.resp")[0][0][0]
+
+    assert refusal(channel, "resp") == ""

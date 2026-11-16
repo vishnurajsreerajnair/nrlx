@@ -1,9 +1,9 @@
 """Health checks of the channels of a response file
 
 Tier 2: physical checks of each channel, its amplitude, its chains of units and
-rates, its poles and zeros, and its codes. Tier 3: each channel against the NRL
-nominal response of the parts it is built from. (Tier 1, the structure of the
-file, is obspy's reading.)
+rates, its poles and zeros, and its codes, all run by check_channel. Tier 3: each
+channel against the NRL nominal response of the parts it is built from. (Tier 1,
+the structure of the file, is obspy's reading.)
 
 
 """
@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import cmath
 import math
-from itertools import pairwise
 from typing import Literal
 
 from obspy.core.inventory.response import (
@@ -55,6 +54,12 @@ VELOCITY = ["M/S", "M/SEC"]
 ACCELERATION = ["M/S**2", "M/SEC**2"]
 PRESSURE = ["PA", "HPA", "KPA", "MBAR"]
 
+# the instrument codes of the sensors (SEED manual, appendix A): seismometers H L
+# P, accelerometer N, gravimeter G, pressure D, magnetometer F, tilt A, rotation J,
+# strain S V; any other channel is auxiliary (mass position, temperature, voltage,
+# clock, LOG, OCF)
+SENSORS = ["H", "L", "P", "N", "G", "D", "F", "A", "J", "S", "V"]
+
 
 def check_amplitude(
     response: Response, sample_rate: float | None
@@ -95,6 +100,21 @@ def check_amplitude(
             match stated:
                 case None:
                     findings.append(("info", "no stages to check the sensitivity"))
+                # at or above Nyquist the anti-alias filters cut the stages: the
+                # ratio says where the sensitivity is, not that its value is wrong
+                case computed, ratio if (
+                    abs(ratio - 1.0) > SENSITIVITY_ERROR
+                    and sample_rate
+                    and frequency >= sample_rate / 2.0
+                ):
+                    findings.append(
+                        (
+                            "warning",
+                            f"stated {value:.6g} at {frequency:g} Hz, at or above "
+                            f"Nyquist, where the stages give {computed:.6g} "
+                            f"(x{ratio:.4g}): state the sensitivity in the passband",
+                        )
+                    )
                 case computed, ratio if abs(ratio - 1.0) > SENSITIVITY_ERROR:
                     findings.append(
                         (
@@ -149,8 +169,8 @@ def check_amplitude(
             (
                 "warning",
                 f"stage {number}: the normalization factor gives x{factor:.6g} of "
-                f"its gain at {frequency:g} Hz: obspy and the NRL service give "
-                "different amplitudes",
+                f"its gain at {frequency:g} Hz: evalresp (which trusts A0) and "
+                "tools that trust the stage gain give different amplitudes",
             )
         )
 
@@ -195,40 +215,54 @@ def check_chains(
         else:
             findings.append(("error", f"stages numbered {numbers}, not 1 to N"))
 
-        # each stage takes the units the previous one gives
-        breaks = [
-            f"stage {after.stage_sequence_number} takes {after.input_units or '-'} "
-            f"after {before.output_units or '-'}"
-            for before, after in pairwise(stages)
-            if str(before.output_units).upper() != str(after.input_units).upper()
-        ]
+        # each stage takes the units the previous one gives; a stage with only a
+        # gain has no units in StationXML, so it passes them through
+        breaks = list()
+        given = None
+        for stage in stages:
+            if (
+                given is not None
+                and stage.input_units
+                and str(stage.input_units).upper() != given.upper()
+            ):
+                breaks.append(
+                    f"stage {stage.stage_sequence_number} takes {stage.input_units} "
+                    f"after {given}"
+                )
+            if stage.output_units:
+                given = str(stage.output_units)
         chain = " -> ".join(
-            [str(stages[0].input_units)] + [str(stage.output_units) for stage in stages]
+            [str(stages[0].input_units or "-")]
+            + [str(stage.output_units or "-") for stage in stages]
         )
         if breaks:
             findings.append(("error", f"units break: {'; '.join(breaks)}"))
         else:
             findings.append(("ok", f"units {chain}"))
 
-        # the channel gives counts
-        last = str(stages[-1].output_units).upper()
-        if last not in COUNTS:
+        # the channel gives counts: the last units a stage states
+        last = given.upper() if given is not None else ""
+        if not last:
+            findings.append(("info", "no stage states its output units"))
+        elif last not in COUNTS:
             findings.append(("error", f"the last stage gives {last}, not counts"))
 
-        # the sensitivity is in the units of the stages
+        # the sensitivity is in the units of the stages (COUNT and COUNTS alike),
+        # the first and the last units the stages state; a sensitivity without
+        # input units (an NRL datalogger part) is not compared on its input
         sensitivity = response.instrument_sensitivity
-        if sensitivity is not None:
-            given = (
-                str(sensitivity.input_units).upper(),
-                str(sensitivity.output_units).upper(),
-            )
-            expected = (str(stages[0].input_units).upper(), last)
-            if given != expected:
+        inputs = [str(stage.input_units) for stage in stages if stage.input_units]
+        first = inputs[0].upper() if inputs else ""
+        if sensitivity is not None and first and last:
+            given_in = str(sensitivity.input_units or "").upper()
+            given_out = str(sensitivity.output_units or "").upper()
+            same_out = given_out == last or (given_out in COUNTS and last in COUNTS)
+            if (given_in and given_in != first) or not same_out:
                 findings.append(
                     (
                         "error",
-                        f"sensitivity in {given[0]} -> {given[1]}, the stages in "
-                        f"{expected[0]} -> {expected[1]}",
+                        f"sensitivity in {given_in} -> {given_out}, the stages in "
+                        f"{first} -> {last}",
                     )
                 )
 
@@ -444,6 +478,60 @@ def check_codes(
                 f"not {units}",
             )
         )
+
+    return findings
+
+
+def check_channel(
+    response: Response, sample_rate: float | None, code: str | None
+) -> list[tuple[str, Severity, str]]:
+    """Tier 2 checks of a channel: its amplitude, its chains, its poles and zeros,
+    and its codes
+
+    Args:
+        response: response of the channel.
+        sample_rate: sample rate of the channel, None when unknown.
+        code: channel code, for example HHZ; None skips the codes (an NRL part).
+
+    Returns:
+        group, severity and message of each finding, in group then check order.
+
+
+    """
+    # an auxiliary channel (state of health, log, temperature) without a usable
+    # sensitivity has nothing to check: an info, not an error
+    sensitivity = response.instrument_sensitivity
+    unusable = response.instrument_polynomial is None and (
+        sensitivity is None or not sensitivity.value or float(sensitivity.value) <= 0.0
+    )
+    groups: list[tuple[str, list[tuple[Severity, str]]]]
+    if code is not None and code[1:2] not in SENSORS and unusable:
+        groups = [
+            (
+                "amplitude",
+                [("info", f"auxiliary channel {code}: no sensitivity to check")],
+            )
+        ]
+    else:
+        groups = [
+            ("amplitude", check_amplitude(response, sample_rate)),
+            ("chains", check_chains(response, sample_rate)),
+            ("poles", check_poles(response)),
+        ]
+
+    # the codes against the rate and the input units of the sensitivity
+    if code is not None:
+        units = (
+            response.instrument_sensitivity.input_units
+            if response.instrument_sensitivity is not None
+            else None
+        )
+        groups.append(("codes", check_codes(code, sample_rate, units)))
+    findings = [
+        (group, severity, message)
+        for group, found in groups
+        for severity, message in found
+    ]
 
     return findings
 

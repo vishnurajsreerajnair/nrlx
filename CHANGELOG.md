@@ -42,7 +42,7 @@ command, `nrlx response`; the Python API changes as listed below.
   file to look at. SACPZ keeps the first poles and zeros stage and the overall
   sensitivity: a note says how many stages it drops and how far it is from the
   whole response, in band and at the top (an STS-2 on a Q330 at 40 sps: within
-  4.9 % up to 3.6 Hz, 28.9 % at 16 Hz). SACPZ refuses, before writing, the
+  4.9 % up to 3.6 Hz, 28.9 % at 16 Hz). SACPZ leaves out, with a note, the
   channels obspy would skip silently: without poles and zeros, or with an input
   other than m, m/s or m/s**2 (a pressure sensor, a polynomial).
   `nrlx response -o FILE.pz` writes SACPZ too.
@@ -114,6 +114,9 @@ command, `nrlx response`; the Python API changes as listed below.
   - `check_codes`: warnings for a band code that does not fit the sample rate and
     an instrument code that does not fit the input units (H, L, P in m/s, N in
     m/s**2, D in Pa).
+  - `check_channel(response, sample_rate, code)` runs the four groups and returns
+    flat `(group, severity, message)` findings, without the codes when `code` is
+    None (a part of the NRL); `nrlx doctor` and `scan_nrl` both use it.
 
   On the whole NRL v2 they find 18 sensor files with poles of the wrong sign
   (REFTEK RT131, RSensors CME, Guralp CMG-5T, ...), 448 datalogger files with an
@@ -318,6 +321,30 @@ command, `nrlx response`; the Python API changes as listed below.
 
 ### Fixed
 
+- **`nrlx doctor` no longer crashes on a response evalresp refuses** (stages out
+  of order, a units break, a sensitivity of 0, a stage removed): the comparison
+  with the nominal reports "curve not computed by evalresp" as an error and the
+  tier 2 findings explain why. Found by injecting 14 kinds of faults in 10 NRL
+  builds: 31 of 127 runs ended in a traceback before.
+- **`nrlx doctor` takes COUNT and COUNTS as the same units** in the sensitivity,
+  whatever the case: a sensitivity in COUNTS over stages ending in COUNT was an
+  error (30 of the 39 errors on the real RESIF file FR.CIEL).
+- **`nrlx doctor`: a sensitivity stated at or above Nyquist** that its stages do
+  not give is a warning naming the cause ("state the sensitivity in the passband"),
+  no longer an error: there the anti-alias filters cut the stages, so the ratio
+  (x2.8e6 on FR.CIEL LH, whose value is right at 0.05 Hz) says where the
+  sensitivity is, not that its value is wrong. In band it stays an error.
+- **`nrlx doctor`: a stage with only a gain passes the units through.** StationXML
+  writes no units for such a stage; it was read as a units break and a last stage
+  in NONE (35 of the 38 errors on the real SCEDC file CI.PAS). A channel whose
+  stages state no output units is an info.
+- **`nrlx doctor`: auxiliary channels** (any instrument code other than the sensors
+  H L P N G D F A J S V: mass position, temperature, voltage, clock, LOG, OCF)
+  without a usable sensitivity or without a response are an info, no longer an
+  error (`core.doctor.SENSORS`, used by `check_channel` and the command).
+- **`nrlx doctor`: the normalization-factor warning** says "evalresp (which trusts
+  A0) and tools that trust the stage gain give different amplitudes", true of any
+  file, instead of naming the NRL service.
 - **The SACPZ constant when the sensitivity is not at the frequency of A0.**
   SACPZ writes CONSTANT = A0 × the overall sensitivity (rdseed, IRIS, obspy),
   right only when A0 normalizes the poles and zeros at the frequency of the
@@ -350,6 +377,29 @@ command, `nrlx response`; the Python API changes as listed below.
 - Repeated channels are rejected, instead of writing the same file twice.
 - File paths and catalog texts with square brackets are no longer read as Rich
   markup in the output.
+- **`nrlx convert` skips the channels a format cannot hold**, with a note listing
+  them by reason, instead of refusing the whole file (a station with SOH channels
+  to SACPZ); none held is still an error. `io.inventory.refusal` says why a format
+  cannot hold a channel and `writable_channels` keeps the others; `write_inventory`
+  refuses with the same rule (`Cannot write FORMAT: ID: reason`). RESP now also
+  refuses a channel without stages, sensitivity or polynomial (obspy reads it back
+  as no response) and a stage numbered 0, the number RESP keeps for the
+  sensitivity (the stage was lost).
+- `nrlx convert` and `nrlx doctor` refuse a file without channels
+  (`No channel in FILE`) instead of writing an empty file or crashing.
+- The check of a converted file no longer crashes or refuses a lossless file when
+  evalresp cannot compute the input (no stages, a polynomial of more than 3
+  coefficients, `Illegal RESP format`): the curve is noted as not checked. A file
+  read back that evalresp cannot compute is an error. A RESP with a channel
+  polynomial and polynomial stages compares the stages, as obspy drops its stage 0
+  on reading (false "reads back inf different").
+- SACPZ of poles and zeros in Hz: converted to rad/s before obspy's writer, which
+  crashes on poles without uncertainties.
+- RESP keeps the fraction of a second of the epochs (`2022,112,05:53:33.7490`),
+  leaves out the stage 0 of a sensitivity without value (it crashed), and the
+  gain of a stage without one, which it wrote as 0 (evalresp refused the file).
+- `nrlx doctor`: a sensitivity without input units (the NRL datalogger parts) is
+  no longer an error against the units of the stages.
 
 ## [0.2.1] - 2026-09-27
 

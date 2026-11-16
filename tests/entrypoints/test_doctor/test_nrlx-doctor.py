@@ -170,6 +170,23 @@ def test_doctor_warns_on_a_calibrated_gain_with_the_stage(
     assert "XY.T13.00.HHZ nominal: differs: stage 1: gain 1530 for 1500" in output
 
 
+def test_doctor_reports_a_response_evalresp_refuses(cache_root, fake_service, tmp_path):
+    path = built_by_nrlx(cache_root, fake_service, tmp_path / "built.xml")
+    inventory = obspy.read_inventory(str(path))
+    for channel in inventory[0][0]:
+        channel.response.response_stages[-1].stage_sequence_number += 1
+    inventory.write(str(path), format="STATIONXML")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        code, output = doctor([str(path), "--cache-root", str(cache_root)])
+
+    assert code == 1, output
+    assert "Traceback" not in output
+    assert "XY.T13.00.HHZ chains: stages numbered" in output
+    assert "XY.T13.00.HHZ nominal: curve not computed by evalresp:" in output
+
+
 def test_doctor_takes_the_keys_for_a_file_without_comment(
     cache_root, fake_service, station_xml
 ):

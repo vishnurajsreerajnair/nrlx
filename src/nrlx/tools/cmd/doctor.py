@@ -15,13 +15,12 @@ from rich.table import Table
 from nrlx.core.assets import PROVENANCE_SUBJECT
 from nrlx.core.convert import check_frequencies
 from nrlx.core.doctor import (
+    SENSORS,
     Severity,
-    check_amplitude,
-    check_chains,
+    check_channel,
     check_codes,
     check_nominal_curve,
     check_nominal_kind,
-    check_poles,
     check_sacpz,
     stage_changes,
 )
@@ -121,8 +120,9 @@ def doctor(
     ]
     given = bool(sensor_keys or datalogger_keys or integrated_keys)
 
-    # the findings of each channel by group, and the nominals built, once each
-    rows: list[tuple[str, list[tuple[str, list[tuple[Severity, str]]]]]] = list()
+    # the findings of each channel (group, severity, message), and the nominals
+    # built, once each
+    rows: list[tuple[str, list[tuple[str, Severity, str]]]] = list()
     built: list[str] = list()
     if path.suffix.lower() in (".pz", ".sacpz"):
         # SACPZ: obspy does not read it, nrlx does; no stages
@@ -141,18 +141,20 @@ def doctor(
             raise typer.Exit(code=1)
         for seedid, zeros, poles, constant, rate in kept:
             code = seedid.rpartition(".")[2]
-            rows.append(
-                (
-                    seedid,
-                    [
-                        ("amplitude", [("info", "SACPZ: no stages")]),
-                        ("chains", [("info", "SACPZ: no stages")]),
-                        ("poles", check_sacpz(zeros, poles, constant)),
-                        ("codes", check_codes(code, rate, None)),
-                        ("nominal", [("info", "SACPZ: not compared")]),
-                    ],
-                )
-            )
+            sacpz: list[tuple[str, Severity, str]] = [
+                ("amplitude", "info", "SACPZ: no stages"),
+                ("chains", "info", "SACPZ: no stages"),
+            ]
+            sacpz += [
+                ("poles", severity, message)
+                for severity, message in check_sacpz(zeros, poles, constant)
+            ]
+            sacpz += [
+                ("codes", severity, message)
+                for severity, message in check_codes(code, rate, None)
+            ]
+            sacpz.append(("nominal", "info", "SACPZ: not compared"))
+            rows.append((seedid, sacpz))
     else:
         try:
             inventory = read_channels(path, selected)
@@ -180,21 +182,15 @@ def doctor(
                     seedid = f"{net.code}.{sta.code}.{cha.location_code}.{cha.code}"
                     response = cha.response
                     rate = cha.sample_rate or None
+                    # no response: an error for a sensor, an info for an
+                    # auxiliary channel (LOG, OCF, temperatures)
                     if response is None:
-                        missing: list[tuple[Severity, str]] = [("error", "no response")]
-                        rows.append((seedid, [("amplitude", missing)]))
+                        severity: Severity = (
+                            "error" if cha.code[1:2] in SENSORS else "info"
+                        )
+                        rows.append((seedid, [("amplitude", severity, "no response")]))
                         continue
-                    units = (
-                        response.instrument_sensitivity.input_units
-                        if response.instrument_sensitivity is not None
-                        else None
-                    )
-                    groups = [
-                        ("amplitude", check_amplitude(response, rate)),
-                        ("chains", check_chains(response, rate)),
-                        ("poles", check_poles(response)),
-                        ("codes", check_codes(cha.code, rate, units)),
-                    ]
+                    findings = check_channel(response, rate, cha.code)
 
                     # tier 3: the nominal of the same parts
                     comment = next(
@@ -240,11 +236,21 @@ def doctor(
                                 nominal.response,
                                 rate,
                                 nominal.sample_rate or None,
-                            ) + check_nominal_curve(
-                                frequencies,
-                                evalresp_values(response, frequencies),
-                                evalresp_values(nominal.response, frequencies),
                             )
+
+                            # the curves: evalresp refuses a response broken
+                            # enough (stages out of order, a units break, a zero
+                            # sensitivity), which tier 2 explains
+                            try:
+                                compared += check_nominal_curve(
+                                    frequencies,
+                                    evalresp_values(response, frequencies),
+                                    evalresp_values(nominal.response, frequencies),
+                                )
+                            except ValueError as err:
+                                compared.append(
+                                    ("error", f"curve not computed by evalresp: {err}")
+                                )
                             if any(severity != "ok" for severity, _ in compared):
                                 changes = stage_changes(
                                     list(response.response_stages),
@@ -253,8 +259,10 @@ def doctor(
                                 compared += [
                                     ("info", f"differs: {change}") for change in changes
                                 ]
-                    groups.append(("nominal", compared))
-                    rows.append((seedid, groups))
+                    findings += [
+                        ("nominal", severity, message) for severity, message in compared
+                    ]
+                    rows.append((seedid, findings))
 
     # one row per channel: ok, or how many warnings and errors in each group
     counted = f"{len(rows)} channel" if len(rows) == 1 else f"{len(rows)} channels"
@@ -262,11 +270,10 @@ def doctor(
     table.add_column("channel")
     for group in GROUPS:
         table.add_column(group)
-    for seedid, groups in rows:
-        found = dict(groups)
+    for seedid, findings in rows:
         cells = list()
         for group in GROUPS:
-            severities = [severity for severity, _ in found.get(group, [])]
+            severities = [severity for found, severity, _ in findings if found == group]
             errors, warnings = severities.count("error"), severities.count("warning")
             if errors:
                 plural = "s" if errors > 1 else ""
@@ -287,26 +294,22 @@ def doctor(
 
     # the warnings and errors, with the info of their group (the stages that
     # differ from the nominal), or every finding with --all
-    for seedid, groups in rows:
-        for group, findings in groups:
-            troubled = any(severity in ("warning", "error") for severity, _ in findings)
-            for severity, message in findings:
-                if (
-                    every
-                    or severity in ("warning", "error")
-                    or (troubled and severity == "info")
-                ):
-                    console.print(
-                        f"{style(severity)} {escape(seedid)} {group}: {escape(message)}"
-                    )
+    for seedid, findings in rows:
+        troubled = {
+            group for group, severity, _ in findings if severity in ("warning", "error")
+        }
+        for group, severity, message in findings:
+            if (
+                every
+                or severity in ("warning", "error")
+                or (group in troubled and severity == "info")
+            ):
+                console.print(
+                    f"{style(severity)} {escape(seedid)} {group}: {escape(message)}"
+                )
 
     # an error fails the check
-    if any(
-        severity == "error"
-        for _, groups in rows
-        for _, findings in groups
-        for severity, _ in findings
-    ):
+    if any(severity == "error" for _, findings in rows for _, severity, _ in findings):
         raise typer.Exit(code=1)
 
 

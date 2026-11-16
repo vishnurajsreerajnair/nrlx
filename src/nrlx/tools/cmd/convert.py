@@ -16,6 +16,7 @@ from nrlx.io.inventory import (
     read_channels,
     split_channels,
     verify_written,
+    writable_channels,
     write_inventory,
 )
 from nrlx.schema.response import ResponseFormat
@@ -51,11 +52,12 @@ def convert(
 ) -> None:
     """Convert a response file to StationXML, RESP or SACPZ.
 
-    Every channel of the file is converted, or one with FILE#NET.STA.LOC.CHA. The
-    file written is read back and compared with the input: StationXML and RESP
-    must give the same curves, and for SACPZ, which keeps the first poles and
-    zeros stage and the overall sensitivity, a note says how far it is from the
-    whole response.
+    Every channel of the file is converted, or one with FILE#NET.STA.LOC.CHA; the
+    channels the format cannot hold (no response, or not poles and zeros in m,
+    m/s or m/s**2 for SACPZ) are skipped with a note. The file written is read
+    back and compared with the input: StationXML and RESP must give the same
+    curves, and for SACPZ, which keeps the first poles and zeros stage and the
+    overall sensitivity, a note says how far it is from the whole response.
 
     Example:
 
@@ -87,12 +89,32 @@ def convert(
         errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
         raise typer.Exit(code=1) from err
 
+    # the channels the format cannot hold are skipped, with a note; none held
+    # is an error
+    kept, skipped = writable_channels(inventory, fileformat)
+    reasons = list(dict.fromkeys(reason for _, reason in skipped))
+    grouped = [
+        (
+            reason,
+            ", ".join(
+                dict.fromkeys(seedid for seedid, why in skipped if why == reason)
+            ),
+        )
+        for reason in reasons
+    ]
+    if not kept.networks:
+        listed = "; ".join(f"{reason}: {seedids}" for reason, seedids in grouped)
+        errconsole.print(
+            f"[bold red]Error:[/bold red] Cannot write {fileformat}, {escape(listed)}."
+        )
+        raise typer.Exit(code=1)
+
     # one file, or one per channel named by its SEED id
-    files: list[tuple[Path, Inventory]] = [(output, inventory)]
+    files: list[tuple[Path, Inventory]] = [(output, kept)]
     if split:
         files = [
             (output.with_name(f"{output.stem}_{seedid}{output.suffix}"), single)
-            for seedid, single in split_channels(inventory)
+            for seedid, single in split_channels(kept)
         ]
 
     # each file written, then read back
@@ -106,6 +128,10 @@ def convert(
         errconsole.print(f"[bold red]Error:[/bold red] {escape(str(err))}")
         raise typer.Exit(code=1) from err
 
+    for reason, seedids in grouped:
+        console.print(
+            f"note: skipped ({escape(reason)}): {escape(seedids)}", soft_wrap=True
+        )
     for note in notes:
         console.print(f"note: {escape(note)}", soft_wrap=True)
     written = "\n".join(f"  {escape(str(path))}" for path, _ in files)

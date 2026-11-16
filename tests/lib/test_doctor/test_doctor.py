@@ -11,6 +11,7 @@ from nrlx.core.convert import check_frequencies
 from nrlx.core.doctor import (
     check_amplitude,
     check_chains,
+    check_channel,
     check_codes,
     check_nominal_curve,
     check_nominal_kind,
@@ -63,6 +64,53 @@ def test_a_consistent_channel_passes_every_check():
     assert ("ok", "units m/s -> V -> V -> count -> count") in findings
 
 
+def test_check_channel_runs_the_groups_in_order_with_their_findings():
+    response = sts2_q330()
+
+    findings = check_channel(response, 40.0, "BHZ")
+
+    expected = (
+        [("amplitude", *found) for found in check_amplitude(response, 40.0)]
+        + [("chains", *found) for found in check_chains(response, 40.0)]
+        + [("poles", *found) for found in check_poles(response)]
+        + [("codes", *found) for found in check_codes("BHZ", 40.0, "m/s")]
+    )
+    assert findings == expected
+
+
+@pytest.mark.parametrize("code", ["LKI", "VM1", "LOG", "OCF", "LCE"])
+def test_an_auxiliary_channel_without_sensitivity_is_an_info(code):
+    response = sts2_q330()
+    response.instrument_sensitivity.value = 0.0
+
+    findings = check_channel(response, 1.0, code)
+
+    assert findings[0] == (
+        "amplitude",
+        "info",
+        f"auxiliary channel {code}: no sensitivity to check",
+    )
+    assert "error" not in {severity for _, severity, _ in findings}
+
+
+@pytest.mark.parametrize("code", ["HHZ", "LLZ", "HNZ", "BDF", "LAE", "BS1"])
+def test_a_sensor_without_sensitivity_is_still_an_error(code):
+    response = sts2_q330()
+    response.instrument_sensitivity.value = 0.0
+
+    findings = check_channel(response, 40.0, code)
+
+    assert ("amplitude", "error", "sensitivity 0.0 is not above 0") in findings
+
+
+def test_check_channel_without_a_code_skips_the_codes():
+    response = sts2_q330()
+
+    groups = {group for group, _, _ in check_channel(response, None, None)}
+
+    assert groups == {"amplitude", "chains", "poles"}
+
+
 def test_a_stated_sensitivity_off_its_stages_is_an_error():
     response = sts2_q330()
     response.instrument_sensitivity.value *= 2.0
@@ -95,6 +143,24 @@ def test_a_normalization_factor_off_its_gain_is_a_warning():
 
     assert severity == "warning"
     assert message.startswith("stage 1: the normalization factor gives x0.5 ")
+    assert message.endswith(
+        "evalresp (which trusts A0) and tools that trust the stage gain give "
+        "different amplitudes"
+    )
+
+
+def test_a_sensitivity_value_off_at_nyquist_is_a_warning_not_an_error():
+    response = sts2_q330()
+    sensitivity = response.instrument_sensitivity
+    # the value of the passband, stated at Nyquist where the FIRs cut the stages
+    sensitivity.frequency = 20.0
+
+    found = problems(check_amplitude(response, 40.0))
+
+    assert "error" not in severities(found)
+    [placed] = [message for _, message in found if message.startswith("stated")]
+    assert placed.endswith("state the sensitivity in the passband")
+    assert "at 20 Hz, at or above Nyquist, where the stages give" in placed
 
 
 def test_a_sensitivity_out_of_the_flat_band_or_above_nyquist_is_a_warning():
@@ -145,6 +211,67 @@ def test_a_unit_break_and_no_counts_are_errors():
     assert found[0] == ("error", "units break: stage 3 takes mV after V")
     assert ("error", "the last stage gives V, not counts") in found
     assert ("error", "sensitivity in M/S -> COUNT, the stages in M/S -> V") in found
+
+
+@pytest.mark.parametrize("units", ["COUNTS", "counts", "Count"])
+def test_count_and_counts_are_the_same_units(units):
+    response = sts2_q330()
+    response.instrument_sensitivity.output_units = units
+
+    assert problems(check_chains(response, 40.0)) == []
+
+
+def test_sensitivity_in_other_input_units_is_an_error():
+    response = sts2_q330()
+    response.instrument_sensitivity.input_units = "M/S**2"
+
+    assert problems(check_chains(response, 40.0)) == [
+        ("error", "sensitivity in M/S**2 -> COUNT, the stages in M/S -> COUNT")
+    ]
+
+
+def test_a_gain_only_stage_without_units_passes_them_through():
+    response = sts2_q330()
+    # as CI.PAS writes it: stage 2 with only a gain, no units in StationXML
+    response.response_stages[1].input_units = None
+    response.response_stages[1].output_units = None
+
+    found = check_chains(response, 40.0)
+
+    assert problems(found) == []
+    assert ("ok", "units m/s -> V -> - -> count -> count") in found
+
+
+def test_a_sensitivity_without_input_units_is_not_compared_on_its_input():
+    response = sts2_q330()
+    # as the NRL datalogger parts state it: a gain-only stage 1, no input units
+    response.response_stages[0].input_units = None
+    response.response_stages[0].output_units = None
+    response.instrument_sensitivity.input_units = ""
+
+    assert problems(check_chains(response, 40.0)) == []
+
+
+def test_a_break_across_a_gain_only_stage_is_still_an_error():
+    response = sts2_q330()
+    response.response_stages[1].input_units = None
+    response.response_stages[1].output_units = None
+    response.response_stages[2].input_units = "mV"
+
+    assert ("error", "units break: stage 3 takes mV after V") in problems(
+        check_chains(response, 40.0)
+    )
+
+
+def test_stages_that_state_no_output_units_are_an_info():
+    response = sts2_q330()
+    for stage in response.response_stages:
+        stage.output_units = None
+
+    found = check_chains(response, 40.0)
+
+    assert ("info", "no stage states its output units") in found
+    assert "error" not in severities(found)
 
 
 def test_stages_not_numbered_1_to_n_are_an_error():

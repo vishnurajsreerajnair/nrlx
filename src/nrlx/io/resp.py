@@ -128,19 +128,28 @@ def channel_lines(network: str, station: str, channel: Channel) -> list[str]:
         if stage.decimation_input_sample_rate is not None:
             lines += box("Decimation", codes, start, end)
             lines += decimation_lines(stage)
-        if not isinstance(stage, PolynomialResponseStage):
+        # the gain of the stage; a stage without gain has none, as a gain of 0
+        # makes evalresp refuse the file
+        if (
+            not isinstance(stage, PolynomialResponseStage)
+            and stage.stage_gain is not None
+        ):
             lines += box("Channel Sensitivity/Gain", codes, start, end)
             lines += gain_lines(
                 stage.stage_sequence_number,
-                stage.stage_gain or 0.0,
+                stage.stage_gain,
                 stage.stage_gain_frequency or 0.0,
             )
 
-    # the sensitivity of the channel, stage 0, or its polynomial
+    # the sensitivity of the channel, stage 0, or its polynomial; a sensitivity
+    # without value is left out
     if response.instrument_polynomial is not None:
         lines += box("Response (Polynomial)", codes, start, end)
         lines += polynomial_lines(response.instrument_polynomial, 0)
-    elif response.instrument_sensitivity is not None:
+    elif (
+        response.instrument_sensitivity is not None
+        and response.instrument_sensitivity.value is not None
+    ):
         sensitivity = response.instrument_sensitivity
         lines += box("Channel Sensitivity/Gain", codes, start, end)
         lines += gain_lines(0, sensitivity.value, sensitivity.frequency or 0.0)
@@ -587,10 +596,18 @@ def resp_time(time: UTCDateTime | None) -> str:
         time: the time, None for no end.
 
     Returns:
-        the time, for example 1970,001,00:00:00, or No Ending Time.
+        the time, for example 1970,001,00:00:00, with the ten-thousandths of a
+        second of SEED when the time has a fraction (1970,001,00:00:00.7490), or
+        No Ending Time.
 
 
     """
-    text = "No Ending Time" if time is None else time.strftime("%Y,%j,%H:%M:%S")
+    match time:
+        case None:
+            text = "No Ending Time"
+        case _ if time.microsecond // 100:
+            text = f"{time.strftime('%Y,%j,%H:%M:%S')}.{time.microsecond // 100:04d}"
+        case _:
+            text = time.strftime("%Y,%j,%H:%M:%S")
 
     return text

@@ -117,7 +117,8 @@ def test_convert_refuses_sacpz_without_poles_and_zeros(tmp_path):
     )
 
     assert result.exit_code == 1
-    assert "SACPZ holds only the channels with analog poles and zeros" in result.output
+    assert "Cannot write sacpz, SACPZ holds only the channels" in result.output
+    assert "XX.YY.00.ZZZ" in result.output
     assert not output.exists()
 
 
@@ -143,3 +144,34 @@ def test_convert_fails_when_the_file_reads_back_different(
     assert "reads back 6.7e-04 different from what was written" in result.output
     # the file is kept, to look at
     assert output.exists()
+
+
+def test_convert_skips_a_channel_without_response_with_a_note(station_xml, tmp_path):
+    inventory = obspy.read_inventory(str(station_xml))
+    inventory[0][0][2].response = None
+    source = tmp_path / "mixed.xml"
+    inventory.write(str(source), format="STATIONXML")
+    output = tmp_path / "mixed.resp"
+
+    result = runner.invoke(
+        app, ["convert", str(source), "-o", str(output)], terminal_width=200
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "note: skipped (no response): XY.T13.00.HHE" in result.output
+    [network] = obspy.read_inventory(str(output))
+    assert [cha.code for sta in network for cha in sta] == ["HHZ", "HHN"]
+
+
+def test_convert_refuses_a_file_without_channel(station_xml, tmp_path):
+    inventory = obspy.read_inventory(str(station_xml))
+    inventory[0][0].channels = []
+    source = tmp_path / "stations.xml"
+    inventory.write(str(source), format="STATIONXML")
+    output = tmp_path / "out.xml"
+
+    result = runner.invoke(app, ["convert", str(source), "-o", str(output)])
+
+    assert result.exit_code == 1
+    assert "Error: No channel in" in result.output
+    assert not output.exists()
