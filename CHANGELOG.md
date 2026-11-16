@@ -402,6 +402,7 @@ command, `nrlx response`; the Python API changes as listed below.
   gain of a stage without one, which it wrote as 0 (evalresp refused the file).
 - `nrlx doctor`: a sensitivity without input units (the NRL datalogger parts) is
   no longer an error against the units of the stages.
+- The sdist no longer includes the local `.claude/` folder (now git-ignored).
 
 ## [0.2.1] - 2026-09-27
 
