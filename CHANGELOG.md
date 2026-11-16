@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.0b1] - 2026-11-16
+
 The package is restructured in layers, as in isamgeo-seismic-tools: `schema`
 (msgspec structs of every input), `models` (the structs with their methods), `core`
 (pure functions), `io` (service, cache, obspy) and `tools/cmd` (the commands, the
