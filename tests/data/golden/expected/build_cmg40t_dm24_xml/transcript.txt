@@ -1,0 +1,34 @@
+$ nrlx response --sensor sensor_Guralp_CMG-40T_LP30_HF50_SG1600_STgroundVel --datalogger datalogger_Guralp_CMG-DM24-Mk3-Fixed_TL77_TP400-100-20-10-2-1_FR100 --network XY --location 00 --station T04 --channels HHZ,HHN,HHE -o out.xml --cache-root cache
+exit 0
+                                            sensor: sensor_Guralp_CMG-40T_LP30_HF50_SG1600_STgroundVel                                             
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                    ┃ Value                                                                                                                ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element                  │ sensor                                                                                                               │
+│ Manufacturer             │ Guralp                                                                                                               │
+│ Model                    │ CMG-40T                                                                                                              │
+│ Version                  │ <DATE>                                                                                                           │
+│ Description              │ Guralp; CMG-40T; Long-Period_Corner 30 s; High-Frequency_Corner 50 Hz; Sensitivity 1600 V/m/s; Sensor_Type groundVel │
+│ Long-Period_Corner LP    │ 30 s                                                                                                                 │
+│ High-Frequency_Corner HF │ 50 Hz                                                                                                                │
+│ Sensitivity SG           │ 1600 V/m/s                                                                                                           │
+│ Sensor_Type ST           │ groundVel                                                                                                            │
+└──────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                      datalogger: datalogger_Guralp_CMG-DM24-Mk3-Fixed_TL77_TP400-100-20-10-2-1_FR100                       
+┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                ┃ Value                                                                                             ┃
+┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element              │ datalogger                                                                                        │
+│ Manufacturer         │ Guralp                                                                                            │
+│ Model                │ CMG-DM24-Mk3-Fixed                                                                                │
+│ Version              │ <DATE>                                                                                        │
+│ Description          │ Guralp; CMG-DM24-Mk3-Fixed; Tap_Table_Lookup 77; Taps 400-100-20-10-2-1; Final_Sample_Rate 100 Hz │
+│ Tap_Table_Lookup TL  │ 77                                                                                                │
+│ Taps TP              │ 400-100-20-10-2-1                                                                                 │
+│ Final_Sample_Rate FR │ 100 Hz                                                                                            │
+└──────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────┘
+╭──────────── nrlx ─────────────╮
+│ Response written (stationxml) │
+│                               │
+│   out.xml                     │
+╰───────────────────────────────╯

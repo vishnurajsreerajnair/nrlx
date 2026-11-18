@@ -1,0 +1,79 @@
+$ nrlx prefixes --cache-root cache
+exit 0
+                                      NRL instconfig parameter prefixes                                      
+┏━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Prefix ┃ Meaning                        ┃ Question it answers                                             ┃
+┡━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ AA     │ Anti-Alias Filter Type         │ What is the anti-alias filter type?                             │
+│ AB     │ ADC Bits                       │ What is the ADC bit count?                                      │
+│ AD     │ ADC Type                       │ Which ADC type recorded this channel?                           │
+│ AF     │ Analog Filter Type             │ What is the analog filter type?                                 │
+│ AL     │ Approx Lower Bound             │ What is the input amplitude lower bound for this approximation? │
+│ AR     │ ADC Range                      │ What is the ADC range?                                          │
+│ AU     │ Approx Upper Bound             │ What is the input amplitude upper bound for this approximation? │
+│ BV     │ Board Version                  │ What version is the datalogger board?                           │
+│ CD     │ Channel Description            │ Which is the channel description?                               │
+│ CG     │ Clip Level                     │ What is the accelerometer clip level in +/-g?                   │
+│ CH     │ Channels                       │ What is the datalogger channel number(s)?                       │
+│ CP     │ Component                      │ Which sensor component is this?                                 │
+│ CR     │ Configured Sample Rates        │ What are the configured sample rates?                           │
+│ CS     │ Chip Set                       │ Which chip set does this datalogger use?                        │
+│ CT     │ FIR Cascade Type               │ What FIR cascade type is this?                                  │
+│ DE     │ Decimation Filter              │ What is the decimation filter type?                             │
+│ DF     │ DC Filter                      │ What is the DC removal/low pass filter setting?                 │
+│ DG     │ Digital/Software Gain          │ What is the software gain setting?                              │
+│ DR     │ Decimated Sample Rate          │ What is the decimated sample rate?                              │
+│ EB     │ Extended Bandwidth             │ Is extended bandwidth filtering On or Off?                      │
+│ EG     │ Electronics Generation         │ What is the feedback electronics generation?                    │
+│ FB     │ Feedback Loop Board Type       │ What is the feedback electronics board type?                    │
+│ FD     │ Firmware Date                  │ Is the firmware date before or after <DATE>?                │
+│ FL     │ Frequency Lower Bound          │ What is the frequency lower bound for this approximation?       │
+│ FP     │ Final Filter Phase             │ What is the final filter phase?                                 │
+│ FR     │ Final Sample Rate              │ What is the final sample rate?                                  │
+│ FT     │ Feedback Type                  │ What is the sensor feedback type?                               │
+│ FU     │ Frequency Upper Bound          │ What is the frequency lower bound for this approximation?       │
+│ FV     │ Full-Scale Voltage             │ What is the full scale voltage?                                 │
+│ FW     │ Firmware Version               │ What is the firmware version?                                   │
+│ GT     │ Gain Type                      │ Is the gain fixed or variable?                                  │
+│ HF     │ High-Frequency Corner          │ What is the high-frequency corner?                              │
+│ HR     │ Highest Configured Sample Rate │ What is the highest simultaneous sample rate configured?        │
+│ IT     │ Input Type                     │ What is the input voltage type?                                 │
+│ LF     │ Low-Frequency Corner           │ What is the low-frequency corner?                               │
+│ LP     │ Long-Period Corner             │ What is the long-period corner?                                 │
+│ LR     │ Linear Filter Rates            │ To which sample rates are linear filters applied?               │
+│ MR     │ Main Sample Rate               │ What is the main sample rate?                                   │
+│ MV     │ Model Version                  │ Which version is this model?                                    │
+│ NS     │ Number of Streams              │ How many data stream ran simultaneously?                        │
+│ OB     │ Output Bits                    │ How many output bits should be used?                            │
+│ OS     │ Onboard Sensor                 │ Which onboard sensor does this datalogger use?                  │
+│ OU     │ Output Units                   │ What are the final output units?                                │
+│ OW     │ Output Wiring                  │ Is the output wiring single-ended or differential?              │
+│ PD     │ Preamp Db                      │ What is the preamp gain in dB?                                  │
+│ PG     │ Preamp Gain                    │ What is the preamp gain ratio?                                  │
+│ PP     │ Peak-to-Peak Voltage           │ What is the peak-to-peak voltage?                               │
+│ PR     │ Primary Sample Rate            │ What is the primary sample rate?                                │
+│ RC     │ Coil Resistance                │ What is the coil resistance in ohms?                            │
+│ RS     │ Shunt Resistance               │ What is the shunt resistance in ohms?                           │
+│ SG     │ Sensitivity                    │ What is the sensitivity?                                        │
+│ SM     │ Sensitivity Mode               │ What is the sensitivity mode for this channel?                  │
+│ SN     │ Serial Number                  │ What is the serial number range?                                │
+│ SP     │ Short-Period Corner            │ What is the short-period corner?                                │
+│ ST     │ Sensor Type                    │ What property does this sensor measure?                         │
+│ TG     │ Transmission Gain              │ What is the transmission gain?                                  │
+│ TL     │ Tap Table Lookup               │ What is the tap table lookup number for this channel?           │
+│ TP     │ Taps                           │ What are the taps (sample rate options in Hz) for this channel? │
+│ WS     │ Word Size                      │ What is the output word size in bits?                           │
+│ ZN     │ Input Impedance                │ Is the input impedance high or low?                             │
+└────────┴────────────────────────────────┴─────────────────────────────────────────────────────────────────┘
+
+$ nrlx prefixes corner --cache-root cache
+exit 0
+                   NRL instconfig parameter prefixes                   
+┏━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Prefix ┃ Meaning               ┃ Question it answers                ┃
+┡━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ HF     │ High-Frequency Corner │ What is the high-frequency corner? │
+│ LF     │ Low-Frequency Corner  │ What is the low-frequency corner?  │
+│ LP     │ Long-Period Corner    │ What is the long-period corner?    │
+│ SP     │ Short-Period Corner   │ What is the short-period corner?   │
+└────────┴───────────────────────┴────────────────────────────────────┘

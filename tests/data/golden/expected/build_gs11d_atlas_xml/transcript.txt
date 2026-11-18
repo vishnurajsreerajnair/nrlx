@@ -1,0 +1,35 @@
+$ nrlx response --sensor sensor_GeoSpace_GS-11D_LF10_RC380_RS887_SG22.3_STgroundVel --datalogger datalogger_Lunitek_ATLAS_FV2.5Vpp_FR100_FPLinear --network XY --location 00 --station T07 --channels EHZ -o out.xml --cache-root cache
+exit 0
+                                                 sensor: sensor_GeoSpace_GS-11D_LF10_RC380_RS887_SG22.3_STgroundVel                                                 
+┏━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                   ┃ Value                                                                                                                                  ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element                 │ sensor                                                                                                                                 │
+│ Manufacturer            │ GeoSpace                                                                                                                               │
+│ Model                   │ GS-11D                                                                                                                                 │
+│ Version                 │ <DATE>                                                                                                                             │
+│ Description             │ GeoSpace; GS-11D; Low-Frequency_Corner 10 Hz; Coil_Resistance 380; Shunt_Resistance 887; Sensitivity 22.3 V/m/s; Sensor_Type groundVel │
+│ Low-Frequency_Corner LF │ 10 Hz                                                                                                                                  │
+│ Coil_Resistance RC      │ 380                                                                                                                                    │
+│ Shunt_Resistance RS     │ 887                                                                                                                                    │
+│ Sensitivity SG          │ 22.3 V/m/s                                                                                                                             │
+│ Sensor_Type ST          │ groundVel                                                                                                                              │
+└─────────────────────────┴────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                               datalogger: datalogger_Lunitek_ATLAS_FV2.5Vpp_FR100_FPLinear                               
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                 ┃ Value                                                                                          ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element               │ datalogger                                                                                     │
+│ Manufacturer          │ Lunitek                                                                                        │
+│ Model                 │ ATLAS                                                                                          │
+│ Version               │ <DATE>                                                                                     │
+│ Description           │ Lunitek; ATLAS; Full-Scale_Voltage 2.5Vpp; Final_Sample_Rate 100 Hz; Final_Filter_Phase Linear │
+│ Full-Scale_Voltage FV │ 2.5Vpp                                                                                         │
+│ Final_Sample_Rate FR  │ 100 Hz                                                                                         │
+│ Final_Filter_Phase FP │ Linear                                                                                         │
+└───────────────────────┴────────────────────────────────────────────────────────────────────────────────────────────────┘
+╭──────────── nrlx ─────────────╮
+│ Response written (stationxml) │
+│                               │
+│   out.xml                     │
+╰───────────────────────────────╯

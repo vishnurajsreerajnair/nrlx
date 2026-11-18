@@ -1,0 +1,36 @@
+$ nrlx response --sensor sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel --datalogger datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DENone --network XY --location 00 --station T01 --channels HHZ,HHN,HHE -o out.xml --cache-root cache
+exit 0
+                                            sensor: sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel                                            
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                     ┃ Value                                                                                                                 ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element                   │ sensor                                                                                                                │
+│ Manufacturer              │ Streckeisen                                                                                                           │
+│ Model                     │ STS-2                                                                                                                 │
+│ Version                   │ <DATE>                                                                                                            │
+│ Description               │ Streckeisen; STS-2; Electronics_Generation 3; Sensitivity 1500 V/m/s; Long-Period_Corner 120 s; Sensor_Type groundVel │
+│ Electronics_Generation EG │ 3                                                                                                                     │
+│ Sensitivity SG            │ 1500 V/m/s                                                                                                            │
+│ Long-Period_Corner LP     │ 120 s                                                                                                                 │
+│ Sensor_Type ST            │ groundVel                                                                                                             │
+└───────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                                         datalogger: datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DENone                                         
+┏━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                  ┃ Value                                                                                                                        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element                │ datalogger                                                                                                                   │
+│ Manufacturer           │ Quanterra                                                                                                                    │
+│ Model                  │ Q330HR                                                                                                                       │
+│ Version                │ <DATE>                                                                                                                   │
+│ Description            │ Quanterra; Q330HR; Preamp_Gain 1; Final_Sample_Rate 100 Hz; ADC_Type HR; Linear_Filter_Rates below20; Decimation_Filter None │
+│ Preamp_Gain PG         │ 1                                                                                                                            │
+│ Final_Sample_Rate FR   │ 100 Hz                                                                                                                       │
+│ ADC_Type AD            │ HR                                                                                                                           │
+│ Linear_Filter_Rates LR │ below20                                                                                                                      │
+│ Decimation_Filter DE   │ None                                                                                                                         │
+└────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+╭──────────── nrlx ─────────────╮
+│ Response written (stationxml) │
+│                               │
+│   out.xml                     │
+╰───────────────────────────────╯

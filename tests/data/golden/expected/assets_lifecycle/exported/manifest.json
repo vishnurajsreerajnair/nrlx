@@ -1,0 +1,56 @@
+{
+  "manifest_version": 1,
+  "assets": [
+    {
+      "uid": "SPARE",
+      "version": 1,
+      "added": "<DATE>",
+      "deprecated": null,
+      "sample_rate": 100.0,
+      "input_units": "m/s",
+      "sensitivity": 298919000.0,
+      "sensor": "sensor_Nanometrics_TrilliumCompact120_SG754_LP120_STgroundVel",
+      "datalogger": "datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.001_FPMinimum",
+      "channels": [
+        "XY.T18.00.HHZ",
+        "XY.T18.00.HHN",
+        "XY.T18.00.HHE"
+      ],
+      "sha256": "9cddc09384dbf3cdf6b44bbac4ce6487c7977110b456eda64c2b74b72c5c1a74"
+    },
+    {
+      "uid": "T18",
+      "version": 1,
+      "added": "<DATE>",
+      "deprecated": null,
+      "sample_rate": 100.0,
+      "input_units": "m/s",
+      "sensitivity": 2898840000.0,
+      "sensor": "sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel",
+      "datalogger": "datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DENone",
+      "channels": [
+        "XY.T18.00.HHZ",
+        "XY.T18.00.HHN",
+        "XY.T18.00.HHE"
+      ],
+      "sha256": "b44cddb5725b28d6573c21a154c3a238c70e23bbea1138af0642f4189784e65c"
+    },
+    {
+      "uid": "T18",
+      "version": 2,
+      "added": "<DATE>",
+      "deprecated": "<DATE>",
+      "sample_rate": 100.0,
+      "input_units": "m/s",
+      "sensitivity": 298919000.0,
+      "sensor": "sensor_Nanometrics_TrilliumCompact120_SG754_LP120_STgroundVel",
+      "datalogger": "datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.001_FPMinimum",
+      "channels": [
+        "XY.T18.00.HHZ",
+        "XY.T18.00.HHN",
+        "XY.T18.00.HHE"
+      ],
+      "sha256": "9cddc09384dbf3cdf6b44bbac4ce6487c7977110b456eda64c2b74b72c5c1a74"
+    }
+  ]
+}

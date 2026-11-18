@@ -1,0 +1,164 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<FDSNStationXML xmlns="http://www.fdsn.org/xml/station/1" schemaVersion="1.2">
+  <Source>EarthScope</Source>
+  <Module>EarthScope NRL service | version: 1</Module>
+  <ModuleURI>https://ws-nrlservice.prod.earthscope.org/irisws/nrl/1/combine?instconfig=integrated_Gem_GemInfrasoundV1.0_AR0_LP26_FR100_SG286</ModuleURI>
+  <Created><DATE></Created>
+  <Network code="XY" startDate="<DATE>">
+    <Station code="T09" startDate="<DATE>">
+      <Comment>
+        <Value>This is a comment.</Value>
+      </Comment>
+      <Latitude unit="DEGREES">0.0</Latitude>
+      <Longitude unit="DEGREES">0.0</Longitude>
+      <Elevation>0.0</Elevation>
+      <Site>
+        <Name>Long site name</Name>
+      </Site>
+      <TotalNumberChannels>1</TotalNumberChannels>
+      <SelectedNumberChannels>1</SelectedNumberChannels>
+      <Channel code="BDF" startDate="<DATE>" locationCode="00">
+        <Comment subject="nrlx">
+          <Value>built by nrlx <NRLX> (service): integrated=integrated_Gem_GemInfrasoundV1.0_AR0_LP26_FR100_SG286</Value>
+        </Comment>
+        <Latitude unit="DEGREES">0.0</Latitude>
+        <Longitude unit="DEGREES">0.0</Longitude>
+        <Elevation>0.0</Elevation>
+        <Depth>0.0</Depth>
+        <Azimuth unit="DEGREES">0.0</Azimuth>
+        <Dip unit="DEGREES">0.0</Dip>
+        <SampleRate unit="SAMPLES/S">100.0</SampleRate>
+        <Sensor>
+          <Description>The sensor name</Description>
+        </Sensor>
+        <Response>
+          <InstrumentSensitivity>
+            <Value>0.0</Value>
+            <Frequency>21.2307692</Frequency>
+            <InputUnits>
+              <Name>Pa</Name>
+              <Description>Pascals</Description>
+            </InputUnits>
+            <OutputUnits>
+              <Name>count</Name>
+              <Description>Digital Counts</Description>
+            </OutputUnits>
+          </InstrumentSensitivity>
+          <Stage number="1" resourceId="NRL:AnaPAZ_IUPa_NZ1_NP4_PH031c48b_AN8.50947ep08_FN1::NRL:Gain_SG0.00223138_FN1">
+            <PolesZeros>
+              <InputUnits>
+                <Name>Pa</Name>
+                <Description>Pascals</Description>
+              </InputUnits>
+              <OutputUnits>
+                <Name>V</Name>
+                <Description>Volts</Description>
+              </OutputUnits>
+              <PzTransferFunctionType>LAPLACE (RADIANS/SECOND)</PzTransferFunctionType>
+              <NormalizationFactor>850947000.0</NormalizationFactor>
+              <NormalizationFrequency unit="HERTZ">1.0</NormalizationFrequency>
+              <Zero number="0">
+                <Real>0.0</Real>
+                <Imaginary>0.0</Imaginary>
+              </Zero>
+              <Pole number="0">
+                <Real>-0.244</Real>
+                <Imaginary>0.0</Imaginary>
+              </Pole>
+              <Pole number="1">
+                <Real>-622.123</Real>
+                <Imaginary>0.0</Imaginary>
+              </Pole>
+              <Pole number="2">
+                <Real>-853.22</Real>
+                <Imaginary>0.0</Imaginary>
+              </Pole>
+              <Pole number="3">
+                <Real>-1601.77</Real>
+                <Imaginary>0.0</Imaginary>
+              </Pole>
+            </PolesZeros>
+            <StageGain>
+              <Value>0.00223138</Value>
+              <Frequency>1.0</Frequency>
+            </StageGain>
+          </Stage>
+          <Stage number="2" resourceId="NRL:ADC_SF128000_IR0_ED0">
+            <Coefficients>
+              <InputUnits>
+                <Name>V</Name>
+                <Description>Volts</Description>
+              </InputUnits>
+              <OutputUnits>
+                <Name>count</Name>
+                <Description>Digital Counts</Description>
+              </OutputUnits>
+              <CfTransferFunctionType>DIGITAL</CfTransferFunctionType>
+              <Numerator number="0">1.0</Numerator>
+            </Coefficients>
+            <Decimation>
+              <InputSampleRate unit="HERTZ">0.0</InputSampleRate>
+              <Factor>1</Factor>
+              <Offset>0</Offset>
+              <Delay>0.0</Delay>
+              <Correction>0.0</Correction>
+            </Decimation>
+            <StageGain>
+              <Value>128000.0</Value>
+              <Frequency>1.0</Frequency>
+            </StageGain>
+          </Stage>
+          <Stage number="3" resourceId="NRL:Dec_IR0_OR0_NS1-DC25-00004_NHdbfd12e">
+            <Coefficients>
+              <InputUnits>
+                <Name>count</Name>
+                <Description>Digital Counts</Description>
+              </InputUnits>
+              <OutputUnits>
+                <Name>count</Name>
+                <Description>Digital Counts</Description>
+              </OutputUnits>
+              <CfTransferFunctionType>DIGITAL</CfTransferFunctionType>
+              <Numerator number="0">0.000652849</Numerator>
+              <Numerator number="1">-0.000643441</Numerator>
+              <Numerator number="2">-0.00317364</Numerator>
+              <Numerator number="3">-0.007352</Numerator>
+              <Numerator number="4">-0.0116788</Numerator>
+              <Numerator number="5">-0.0123763</Numerator>
+              <Numerator number="6">-0.00446166</Numerator>
+              <Numerator number="7">0.0159851</Numerator>
+              <Numerator number="8">0.0493526</Numerator>
+              <Numerator number="9">0.0911194</Numerator>
+              <Numerator number="10">0.132479</Numerator>
+              <Numerator number="11">0.162984</Numerator>
+              <Numerator number="12">0.174225</Numerator>
+              <Numerator number="13">0.162984</Numerator>
+              <Numerator number="14">0.132479</Numerator>
+              <Numerator number="15">0.0911194</Numerator>
+              <Numerator number="16">0.0493526</Numerator>
+              <Numerator number="17">0.0159851</Numerator>
+              <Numerator number="18">-0.00446166</Numerator>
+              <Numerator number="19">-0.0123763</Numerator>
+              <Numerator number="20">-0.0116788</Numerator>
+              <Numerator number="21">-0.007352</Numerator>
+              <Numerator number="22">-0.00317364</Numerator>
+              <Numerator number="23">-0.000643441</Numerator>
+              <Numerator number="24">0.000652849</Numerator>
+            </Coefficients>
+            <Decimation>
+              <InputSampleRate unit="HERTZ">0.0</InputSampleRate>
+              <Factor>4</Factor>
+              <Offset>0</Offset>
+              <Delay>0.03</Delay>
+              <Correction>0.03</Correction>
+            </Decimation>
+            <StageGain>
+              <Value>1.0</Value>
+              <Frequency>0.0</Frequency>
+            </StageGain>
+          </Stage>
+        </Response>
+      </Channel>
+    </Station>
+  </Network>
+</FDSNStationXML>

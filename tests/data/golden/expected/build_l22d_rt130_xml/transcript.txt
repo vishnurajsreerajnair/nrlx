@@ -1,0 +1,34 @@
+$ nrlx response --sensor sensor_Sercel_L-22D_LF2_RC5470_RS20000_SG87.9_STgroundVel --datalogger datalogger_REFTEK_130-01_PG32_FR100 --network XY --location 00 --station T05 --channels EHZ,EHN,EHE -o out.xml --cache-root cache
+exit 0
+                                                 sensor: sensor_Sercel_L-22D_LF2_RC5470_RS20000_SG87.9_STgroundVel                                                 
+┏━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                   ┃ Value                                                                                                                                 ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element                 │ sensor                                                                                                                                │
+│ Manufacturer            │ Sercel                                                                                                                                │
+│ Model                   │ L-22D                                                                                                                                 │
+│ Version                 │ <DATE>                                                                                                                            │
+│ Description             │ Sercel; L-22D; Low-Frequency_Corner 2 Hz; Coil_Resistance 5470; Shunt_Resistance 20000; Sensitivity 87.9 V/m/s; Sensor_Type groundVel │
+│ Low-Frequency_Corner LF │ 2 Hz                                                                                                                                  │
+│ Coil_Resistance RC      │ 5470                                                                                                                                  │
+│ Shunt_Resistance RS     │ 20000                                                                                                                                 │
+│ Sensitivity SG          │ 87.9 V/m/s                                                                                                                            │
+│ Sensor_Type ST          │ groundVel                                                                                                                             │
+└─────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                  datalogger: datalogger_REFTEK_130-01_PG32_FR100                  
+┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                ┃ Value                                                    ┃
+┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element              │ datalogger                                               │
+│ Manufacturer         │ REFTEK                                                   │
+│ Model                │ 130-01                                                   │
+│ Version              │ <DATE>                                               │
+│ Description          │ REFTEK; 130-01; Preamp_Gain 32; Final_Sample_Rate 100 Hz │
+│ Preamp_Gain PG       │ 32                                                       │
+│ Final_Sample_Rate FR │ 100 Hz                                                   │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+╭──────────── nrlx ─────────────╮
+│ Response written (stationxml) │
+│                               │
+│   out.xml                     │
+╰───────────────────────────────╯

@@ -1,0 +1,20 @@
+$ nrlx response --soh soh_Quanterra_Q330HR-PacketBaler_CDInputVoltage_SG6.667_FR0.1 --network XY --location 00 --station T10 --channels VEI -o out.xml --cache-root cache
+exit 0
+                                   soh: soh_Quanterra_Q330HR-PacketBaler_CDInputVoltage_SG6.667_FR0.1                                    
+┏━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                  ┃ Value                                                                                                        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element                │ soh                                                                                                          │
+│ Manufacturer           │ Quanterra                                                                                                    │
+│ Model                  │ Q330HR-PacketBaler                                                                                           │
+│ Version                │ <DATE>                                                                                                   │
+│ Description            │ Quanterra; Q330HR-PacketBaler; Channel_Description InputVoltage; Sensitivity 6.667; Final_Sample_Rate 0.1 Hz │
+│ Channel_Description CD │ InputVoltage                                                                                                 │
+│ Sensitivity SG         │ 6.667                                                                                                        │
+│ Final_Sample_Rate FR   │ 0.1 Hz                                                                                                       │
+└────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+╭──────────── nrlx ─────────────╮
+│ Response written (stationxml) │
+│                               │
+│   out.xml                     │
+╰───────────────────────────────╯

@@ -1,0 +1,23 @@
+$ nrlx response --integrated integrated_Gem_GemInfrasoundV1.0_AR0_LP26_FR100_SG286 --network XY --location 00 --station T09 --channels BDF -o out.xml --cache-root cache
+exit 0
+                                 integrated: integrated_Gem_GemInfrasoundV1.0_AR0_LP26_FR100_SG286                                 
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                 ┃ Value                                                                                                   ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element               │ integrated                                                                                              │
+│ Manufacturer          │ Gem                                                                                                     │
+│ Model                 │ GemInfrasoundV1.0                                                                                       │
+│ Version               │ <DATE>                                                                                              │
+│ Description           │ Gem; GemInfrasoundV1.0; ADC_Range 0; Long-Period_Corner 26 s; Final_Sample_Rate 100 Hz; Sensitivity 286 │
+│ ADC_Range AR          │ 0                                                                                                       │
+│ Long-Period_Corner LP │ 26 s                                                                                                    │
+│ Final_Sample_Rate FR  │ 100 Hz                                                                                                  │
+│ Sensitivity SG        │ 286                                                                                                     │
+└───────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+note: the sensitivity cannot be checked: Stage 2 is digital but has no input sample rate.
+note: BDF at 100 sps, the SEED norm gives the band H or E
+╭──────────── nrlx ─────────────╮
+│ Response written (stationxml) │
+│                               │
+│   out.xml                     │
+╰───────────────────────────────╯

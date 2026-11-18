@@ -1,0 +1,126 @@
+$ nrlx response --sensor sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel --datalogger datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DENone --network XY --location 00 --station T16 --channels HHZ,HHN,HHE -o out.xml --cache-root cache
+exit 0
+                                            sensor: sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel                                            
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                     ┃ Value                                                                                                                 ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element                   │ sensor                                                                                                                │
+│ Manufacturer              │ Streckeisen                                                                                                           │
+│ Model                     │ STS-2                                                                                                                 │
+│ Version                   │ <DATE>                                                                                                            │
+│ Description               │ Streckeisen; STS-2; Electronics_Generation 3; Sensitivity 1500 V/m/s; Long-Period_Corner 120 s; Sensor_Type groundVel │
+│ Electronics_Generation EG │ 3                                                                                                                     │
+│ Sensitivity SG            │ 1500 V/m/s                                                                                                            │
+│ Long-Period_Corner LP     │ 120 s                                                                                                                 │
+│ Sensor_Type ST            │ groundVel                                                                                                             │
+└───────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                                         datalogger: datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DENone                                         
+┏━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                  ┃ Value                                                                                                                        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element                │ datalogger                                                                                                                   │
+│ Manufacturer           │ Quanterra                                                                                                                    │
+│ Model                  │ Q330HR                                                                                                                       │
+│ Version                │ <DATE>                                                                                                                   │
+│ Description            │ Quanterra; Q330HR; Preamp_Gain 1; Final_Sample_Rate 100 Hz; ADC_Type HR; Linear_Filter_Rates below20; Decimation_Filter None │
+│ Preamp_Gain PG         │ 1                                                                                                                            │
+│ Final_Sample_Rate FR   │ 100 Hz                                                                                                                       │
+│ ADC_Type AD            │ HR                                                                                                                           │
+│ Linear_Filter_Rates LR │ below20                                                                                                                      │
+│ Decimation_Filter DE   │ None                                                                                                                         │
+└────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+╭──────────── nrlx ─────────────╮
+│ Response written (stationxml) │
+│                               │
+│   out.xml                     │
+╰───────────────────────────────╯
+
+$ nrlx doctor out.xml --all --cache-root cache
+exit 0
+                  Doctor: out.xml (3 channels)                  
+┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━┓
+┃ channel       ┃ amplitude ┃ chains ┃ poles ┃ codes ┃ nominal ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━┩
+│ XY.T16.00.HHZ │ ok        │ ok     │ ok    │ ok    │ ok      │
+│ XY.T16.00.HHN │ ok        │ ok     │ ok    │ ok    │ ok      │
+│ XY.T16.00.HHE │ ok        │ ok     │ ok    │ ok    │ ok      │
+└───────────────┴───────────┴────────┴───────┴───────┴─────────┘
+nominal: sensor=sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel datalogger=datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DENone (service)
+ok      XY.T16.00.HHZ amplitude: sensitivity 2.89884e+09 at 21.2458 Hz, as its stages give (x0.999998)
+ok      XY.T16.00.HHZ amplitude: sensitivity in the sensor's flat band (1.15)
+ok      XY.T16.00.HHZ chains: stages numbered 1 to 4
+ok      XY.T16.00.HHZ chains: units m/s -> V -> V -> count -> count
+ok      XY.T16.00.HHZ chains: decimations chained down to 100 sps
+ok      XY.T16.00.HHZ poles: stage 1: 11 poles, all stable
+ok      XY.T16.00.HHZ codes: band H for 100 sps
+ok      XY.T16.00.HHZ codes: instrument H (a seismometer) in M/S
+ok      XY.T16.00.HHZ nominal: input in M/S, as the nominal
+ok      XY.T16.00.HHZ nominal: amplitude within 0% of the nominal
+ok      XY.T16.00.HHZ nominal: phase within 4.9e-15 deg of the nominal
+ok      XY.T16.00.HHN amplitude: sensitivity 2.89884e+09 at 21.2458 Hz, as its stages give (x0.999998)
+ok      XY.T16.00.HHN amplitude: sensitivity in the sensor's flat band (1.15)
+ok      XY.T16.00.HHN chains: stages numbered 1 to 4
+ok      XY.T16.00.HHN chains: units m/s -> V -> V -> count -> count
+ok      XY.T16.00.HHN chains: decimations chained down to 100 sps
+ok      XY.T16.00.HHN poles: stage 1: 11 poles, all stable
+ok      XY.T16.00.HHN codes: band H for 100 sps
+ok      XY.T16.00.HHN codes: instrument H (a seismometer) in M/S
+ok      XY.T16.00.HHN nominal: input in M/S, as the nominal
+ok      XY.T16.00.HHN nominal: amplitude within 0% of the nominal
+ok      XY.T16.00.HHN nominal: phase within 4.9e-15 deg of the nominal
+ok      XY.T16.00.HHE amplitude: sensitivity 2.89884e+09 at 21.2458 Hz, as its stages give (x0.999998)
+ok      XY.T16.00.HHE amplitude: sensitivity in the sensor's flat band (1.15)
+ok      XY.T16.00.HHE chains: stages numbered 1 to 4
+ok      XY.T16.00.HHE chains: units m/s -> V -> V -> count -> count
+ok      XY.T16.00.HHE chains: decimations chained down to 100 sps
+ok      XY.T16.00.HHE poles: stage 1: 11 poles, all stable
+ok      XY.T16.00.HHE codes: band H for 100 sps
+ok      XY.T16.00.HHE codes: instrument H (a seismometer) in M/S
+ok      XY.T16.00.HHE nominal: input in M/S, as the nominal
+ok      XY.T16.00.HHE nominal: amplitude within 0% of the nominal
+ok      XY.T16.00.HHE nominal: phase within 4.9e-15 deg of the nominal
+
+$ nrlx response --sensor sensor_Lunitek_TELLUS_LP1_SG400_STgroundVel --datalogger datalogger_Nanometrics_Centaur_FV2Vpp_FR100_DFOff_FPLinear --network XY --location 00 --station T17 --channels HHZ -o out.pz --cache-root cache
+exit 0
+                               sensor: sensor_Lunitek_TELLUS_LP1_SG400_STgroundVel                               
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                 ┃ Value                                                                                 ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element               │ sensor                                                                                │
+│ Manufacturer          │ Lunitek                                                                               │
+│ Model                 │ TELLUS                                                                                │
+│ Version               │ <DATE>                                                                            │
+│ Description           │ Lunitek; TELLUS; Long-Period_Corner 1 s; Sensitivity 400 V/m/s; Sensor_Type groundVel │
+│ Long-Period_Corner LP │ 1 s                                                                                   │
+│ Sensitivity SG        │ 400 V/m/s                                                                             │
+│ Sensor_Type ST        │ groundVel                                                                             │
+└───────────────────────┴───────────────────────────────────────────────────────────────────────────────────────┘
+                                   datalogger: datalogger_Nanometrics_Centaur_FV2Vpp_FR100_DFOff_FPLinear                                    
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                 ┃ Value                                                                                                             ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element               │ datalogger                                                                                                        │
+│ Manufacturer          │ Nanometrics                                                                                                       │
+│ Model                 │ Centaur                                                                                                           │
+│ Version               │ <DATE>                                                                                                        │
+│ Description           │ Nanometrics; Centaur; Full-Scale_Voltage 2Vpp; Final_Sample_Rate 100 Hz; DC_Filter Off; Final_Filter_Phase Linear │
+│ Full-Scale_Voltage FV │ 2Vpp                                                                                                              │
+│ Final_Sample_Rate FR  │ 100 Hz                                                                                                            │
+│ DC_Filter DF          │ Off                                                                                                               │
+│ Final_Filter_Phase FP │ Linear                                                                                                            │
+└───────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+note: stage 1: the normalization factor gives x0.998607 of its gain 400 at 5 Hz, kept as received (obspy lets the gain win unless the sensitivity is at 5 Hz); a combination by nrlx corrects it
+╭────────── nrlx ──────────╮
+│ Response written (sacpz) │
+│                          │
+│   out.pz                 │
+╰──────────────────────────╯
+
+$ nrlx doctor out.pz --cache-root cache
+exit 0
+                   Doctor: out.pz (1 channel)                   
+┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━┓
+┃ channel       ┃ amplitude ┃ chains ┃ poles ┃ codes ┃ nominal ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━┩
+│ XY.T17.00.HHZ │ -         │ -      │ ok    │ ok    │ -       │
+└───────────────┴───────────┴────────┴───────┴───────┴─────────┘

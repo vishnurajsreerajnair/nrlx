@@ -1,0 +1,36 @@
+$ nrlx response --sensor sensor_Nanometrics_TrilliumCompact120_SG754_LP120_STgroundVel --datalogger datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.001_FPMinimum --network XY --location 00 --station T08 --channels HHZ,HHN,HHE --split -o out.xml --cache-root cache
+exit 0
+                               sensor: sensor_Nanometrics_TrilliumCompact120_SG754_LP120_STgroundVel                               
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                 ┃ Value                                                                                                   ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element               │ sensor                                                                                                  │
+│ Manufacturer          │ Nanometrics                                                                                             │
+│ Model                 │ TrilliumCompact120                                                                                      │
+│ Version               │ <DATE>                                                                                              │
+│ Description           │ Nanometrics; TrilliumCompact120; Sensitivity 754 V/m/s; Long-Period_Corner 120 s; Sensor_Type groundVel │
+│ Sensitivity SG        │ 754 V/m/s                                                                                               │
+│ Long-Period_Corner LP │ 120 s                                                                                                   │
+│ Sensor_Type ST        │ groundVel                                                                                               │
+└───────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                                   datalogger: datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.001_FPMinimum                                    
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                 ┃ Value                                                                                                                 ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element               │ datalogger                                                                                                            │
+│ Manufacturer          │ Nanometrics                                                                                                           │
+│ Model                 │ Centaur                                                                                                               │
+│ Version               │ <DATE>                                                                                                            │
+│ Description           │ Nanometrics; Centaur; Full-Scale_Voltage 40Vpp; Final_Sample_Rate 100 Hz; DC_Filter 0.001; Final_Filter_Phase Minimum │
+│ Full-Scale_Voltage FV │ 40Vpp                                                                                                                 │
+│ Final_Sample_Rate FR  │ 100 Hz                                                                                                                │
+│ DC_Filter DF          │ 0.001                                                                                                                 │
+│ Final_Filter_Phase FP │ Minimum                                                                                                               │
+└───────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+╭──────────── nrlx ─────────────╮
+│ Response written (stationxml) │
+│                               │
+│   out_XY.T08.00.HHZ.xml       │
+│   out_XY.T08.00.HHN.xml       │
+│   out_XY.T08.00.HHE.xml       │
+╰───────────────────────────────╯

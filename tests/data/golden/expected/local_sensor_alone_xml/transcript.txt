@@ -1,0 +1,21 @@
+$ nrlx response --sensor sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel --network XY --location 00 --station T13 --channels HHZ --source local -o out.xml --cache-root cache
+exit 0
+                                            sensor: sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel                                            
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                     ┃ Value                                                                                                                 ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element                   │ sensor                                                                                                                │
+│ Manufacturer              │ Streckeisen                                                                                                           │
+│ Model                     │ STS-2                                                                                                                 │
+│ Version                   │ <DATE>                                                                                                            │
+│ Description               │ Streckeisen; STS-2; Electronics_Generation 3; Sensitivity 1500 V/m/s; Long-Period_Corner 120 s; Sensor_Type groundVel │
+│ Electronics_Generation EG │ 3                                                                                                                     │
+│ Sensitivity SG            │ 1500 V/m/s                                                                                                            │
+│ Long-Period_Corner LP     │ 120 s                                                                                                                 │
+│ Sensor_Type ST            │ groundVel                                                                                                             │
+└───────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+╭──────────── nrlx ─────────────╮
+│ Response written (stationxml) │
+│                               │
+│   out.xml                     │
+╰───────────────────────────────╯

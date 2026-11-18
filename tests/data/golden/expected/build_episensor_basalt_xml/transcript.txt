@@ -1,0 +1,38 @@
+$ nrlx response --sensor sensor_Kinemetrics_Episensor-ES-T_CG4g_FV10Vp_OWSingle-ended_HF200_SG0.2549_STgroundAccel --datalogger datalogger_Kinemetrics_Basalt_PG8_FV10Vpp_FR200_FPCausal --network XY --location 00 --station T06 --channels HNZ,HNN,HNE -o out.xml --cache-root cache
+exit 0
+                                                   sensor: sensor_Kinemetrics_Episensor-ES-T_CG4g_FV10Vp_OWSingle-ended_HF200_SG0.2549_STgroundAccel                                                    
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                    ┃ Value                                                                                                                                                                     ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element                  │ sensor                                                                                                                                                                    │
+│ Manufacturer             │ Kinemetrics                                                                                                                                                               │
+│ Model                    │ Episensor-ES-T                                                                                                                                                            │
+│ Version                  │ <DATE>                                                                                                                                                                │
+│ Description              │ Kinemetrics; Episensor-ES-T; Clip_Level 4g; Full-Scale_Voltage 10Vp; Output_Wiring Single-ended; High-Frequency_Corner 200 Hz; Sensitivity 0.2549 V/m/s**2; Sensor_Type   │
+│                          │ groundAccel                                                                                                                                                               │
+│ Clip_Level CG            │ 4g                                                                                                                                                                        │
+│ Full-Scale_Voltage FV    │ 10Vp                                                                                                                                                                      │
+│ Output_Wiring OW         │ Single-ended                                                                                                                                                              │
+│ High-Frequency_Corner HF │ 200 Hz                                                                                                                                                                    │
+│ Sensitivity SG           │ 0.2549 V/m/s**2                                                                                                                                                           │
+│ Sensor_Type ST           │ groundAccel                                                                                                                                                               │
+└──────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                                    datalogger: datalogger_Kinemetrics_Basalt_PG8_FV10Vpp_FR200_FPCausal                                     
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                 ┃ Value                                                                                                             ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element               │ datalogger                                                                                                        │
+│ Manufacturer          │ Kinemetrics                                                                                                       │
+│ Model                 │ Basalt                                                                                                            │
+│ Version               │ <DATE>                                                                                                        │
+│ Description           │ Kinemetrics; Basalt; Preamp_Gain 8; Full-Scale_Voltage 10Vpp; Final_Sample_Rate 200 Hz; Final_Filter_Phase Causal │
+│ Preamp_Gain PG        │ 8                                                                                                                 │
+│ Full-Scale_Voltage FV │ 10Vpp                                                                                                             │
+│ Final_Sample_Rate FR  │ 200 Hz                                                                                                            │
+│ Final_Filter_Phase FP │ Causal                                                                                                            │
+└───────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+╭──────────── nrlx ─────────────╮
+│ Response written (stationxml) │
+│                               │
+│   out.xml                     │
+╰───────────────────────────────╯

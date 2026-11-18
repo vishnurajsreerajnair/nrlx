@@ -1,0 +1,33 @@
+$ nrlx response --sensor STS-2,SG=1500 --datalogger Q330HR,FR=100 --cache-root cache
+exit 0
+                            sensor: 3 configurations                            
+┏━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Manufacturer ┃ Model ┃ Instconfig                                            ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Streckeisen  │ STS-2 │ sensor_Streckeisen_STS-2_EG1_SG1500_LP120_STgroundVel │
+│ Streckeisen  │ STS-2 │ sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel │
+│ Streckeisen  │ STS-2 │ sensor_Streckeisen_STS-2_EG2_SG1500_LP120_STgroundVel │
+└──────────────┴───────┴───────────────────────────────────────────────────────┘
+Still varying: EG 1, 2, 3
+                              datalogger: 16 configurations                              
+┏━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Manufacturer ┃ Model  ┃ Instconfig                                                    ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG1_FR100_ADSR_LRbelow20_DENone   │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG20_FR100_ADHR_LRbelow40_DENone  │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG20_FR100_ADSR_LRbelow100_DENone │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DENone   │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG20_FR100_ADSR_LRall_DENone      │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG1_FR100_ADSR_LRbelow100_DENone  │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow100_DENone  │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG20_FR100_ADHR_LRbelow100_DENone │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG1_FR100_ADSR_LRall_DENone       │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG20_FR100_ADHR_LRbelow20_DENone  │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow40_DENone   │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG20_FR100_ADSR_LRbelow20_DENone  │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG20_FR100_ADHR_LRall_DENone      │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG1_FR100_ADSR_LRbelow40_DENone   │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRall_DENone       │
+│ Quanterra    │ Q330HR │ datalogger_Quanterra_Q330HR_PG20_FR100_ADSR_LRbelow40_DENone  │
+└──────────────┴────────┴───────────────────────────────────────────────────────────────┘
+Still varying: AD HR, SR · LR all, below100, below20, below40 · PG 1, 20

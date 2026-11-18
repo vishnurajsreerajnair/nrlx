@@ -1,0 +1,11 @@
+$ nrlx doctor wrong_sensitivity.xml --no-nominal --cache-root cache
+exit 1
+             Doctor: wrong_sensitivity.xml (1 channel)             
+┏━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┓
+┃ channel      ┃ amplitude ┃ chains ┃ poles ┃ codes     ┃ nominal ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━┩
+│ XX.YY.00.ZZZ │ 1 error   │ ok     │ ok    │ 1 warning │ -       │
+└──────────────┴───────────┴────────┴───────┴───────────┴─────────┘
+error   XX.YY.00.ZZZ amplitude: stated 5.2819e+09 at 8.49583 Hz, the stages give 2.64095e+09 (x2): remove_response and remove_sensitivity disagree
+warning XX.YY.00.ZZZ codes: band Z for 40 sps: the SEED norm gives B or S
+info    XX.YY.00.ZZZ codes: instrument Z: units not compared

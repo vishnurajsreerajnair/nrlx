@@ -1,0 +1,174 @@
+$ nrlx response --sensor sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel --datalogger datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DENone --network XY --location 00 --station T18 --channels HHZ,HHN,HHE -o a.xml --cache-root cache
+exit 0
+                                            sensor: sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel                                            
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                     ┃ Value                                                                                                                 ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element                   │ sensor                                                                                                                │
+│ Manufacturer              │ Streckeisen                                                                                                           │
+│ Model                     │ STS-2                                                                                                                 │
+│ Version                   │ <DATE>                                                                                                            │
+│ Description               │ Streckeisen; STS-2; Electronics_Generation 3; Sensitivity 1500 V/m/s; Long-Period_Corner 120 s; Sensor_Type groundVel │
+│ Electronics_Generation EG │ 3                                                                                                                     │
+│ Sensitivity SG            │ 1500 V/m/s                                                                                                            │
+│ Long-Period_Corner LP     │ 120 s                                                                                                                 │
+│ Sensor_Type ST            │ groundVel                                                                                                             │
+└───────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                                         datalogger: datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DENone                                         
+┏━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                  ┃ Value                                                                                                                        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element                │ datalogger                                                                                                                   │
+│ Manufacturer           │ Quanterra                                                                                                                    │
+│ Model                  │ Q330HR                                                                                                                       │
+│ Version                │ <DATE>                                                                                                                   │
+│ Description            │ Quanterra; Q330HR; Preamp_Gain 1; Final_Sample_Rate 100 Hz; ADC_Type HR; Linear_Filter_Rates below20; Decimation_Filter None │
+│ Preamp_Gain PG         │ 1                                                                                                                            │
+│ Final_Sample_Rate FR   │ 100 Hz                                                                                                                       │
+│ ADC_Type AD            │ HR                                                                                                                           │
+│ Linear_Filter_Rates LR │ below20                                                                                                                      │
+│ Decimation_Filter DE   │ None                                                                                                                         │
+└────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+╭──────────── nrlx ─────────────╮
+│ Response written (stationxml) │
+│                               │
+│   a.xml                       │
+╰───────────────────────────────╯
+
+$ nrlx response --sensor sensor_Nanometrics_TrilliumCompact120_SG754_LP120_STgroundVel --datalogger datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.001_FPMinimum --network XY --location 00 --station T18 --channels HHZ,HHN,HHE -o b.xml --cache-root cache
+exit 0
+                               sensor: sensor_Nanometrics_TrilliumCompact120_SG754_LP120_STgroundVel                               
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                 ┃ Value                                                                                                   ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element               │ sensor                                                                                                  │
+│ Manufacturer          │ Nanometrics                                                                                             │
+│ Model                 │ TrilliumCompact120                                                                                      │
+│ Version               │ <DATE>                                                                                              │
+│ Description           │ Nanometrics; TrilliumCompact120; Sensitivity 754 V/m/s; Long-Period_Corner 120 s; Sensor_Type groundVel │
+│ Sensitivity SG        │ 754 V/m/s                                                                                               │
+│ Long-Period_Corner LP │ 120 s                                                                                                   │
+│ Sensor_Type ST        │ groundVel                                                                                               │
+└───────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                                   datalogger: datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.001_FPMinimum                                    
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                 ┃ Value                                                                                                                 ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element               │ datalogger                                                                                                            │
+│ Manufacturer          │ Nanometrics                                                                                                           │
+│ Model                 │ Centaur                                                                                                               │
+│ Version               │ <DATE>                                                                                                            │
+│ Description           │ Nanometrics; Centaur; Full-Scale_Voltage 40Vpp; Final_Sample_Rate 100 Hz; DC_Filter 0.001; Final_Filter_Phase Minimum │
+│ Full-Scale_Voltage FV │ 40Vpp                                                                                                                 │
+│ Final_Sample_Rate FR  │ 100 Hz                                                                                                                │
+│ DC_Filter DF          │ 0.001                                                                                                                 │
+│ Final_Filter_Phase FP │ Minimum                                                                                                               │
+└───────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+╭──────────── nrlx ─────────────╮
+│ Response written (stationxml) │
+│                               │
+│   b.xml                       │
+╰───────────────────────────────╯
+
+$ nrlx assets add a.xml --db assets.sqlite
+exit 0
+╭─────────── nrlx ────────────╮
+│ Added T18 v1                │
+│                             │
+│   3 channels, assets.sqlite │
+╰─────────────────────────────╯
+
+$ nrlx assets add a.xml --db assets.sqlite
+exit 1
+Error: T18 already has this response as v1.
+
+$ nrlx assets add b.xml --db assets.sqlite
+exit 0
+╭─────────── nrlx ────────────╮
+│ Added T18 v2                │
+│                             │
+│   3 channels, assets.sqlite │
+╰─────────────────────────────╯
+
+$ nrlx assets add b.xml --uid SPARE --db assets.sqlite
+exit 0
+╭─────────── nrlx ────────────╮
+│ Added SPARE v1              │
+│                             │
+│   3 channels, assets.sqlite │
+╰─────────────────────────────╯
+
+$ nrlx assets list --db assets.sqlite
+exit 0
+                                                                                         Assets: assets.sqlite                                                                                          
+┏━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ UID   ┃ Version ┃ Added      ┃ Status ┃ Rate ┃ Units ┃ Sensitivity ┃ Sensor                                                    ┃ Datalogger                                               ┃ Channels ┃
+┡━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ SPARE │ v1      │ <DATE> │ in use │ 100  │ m/s   │ 2.98919e+08 │ sensor_Nanometrics_TrilliumCompact120_SG754_LP120_STgrou… │ datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.001_FP… │ 3        │
+│ T18   │ v1      │ <DATE> │ in use │ 100  │ m/s   │ 2.89884e+09 │ sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel     │ datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DE… │ 3        │
+│ T18   │ v2      │ <DATE> │ in use │ 100  │ m/s   │ 2.98919e+08 │ sensor_Nanometrics_TrilliumCompact120_SG754_LP120_STgrou… │ datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.001_FP… │ 3        │
+└───────┴─────────┴────────────┴────────┴──────┴───────┴─────────────┴───────────────────────────────────────────────────────────┴──────────────────────────────────────────────────────────┴──────────┘
+
+$ nrlx assets list T18 --db assets.sqlite
+exit 0
+                                                                                         Assets: assets.sqlite                                                                                          
+┏━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ UID ┃ Version ┃ Added      ┃ Status ┃ Rate ┃ Units ┃ Sensitivity ┃ Sensor                                                    ┃ Datalogger                                                 ┃ Channels ┃
+┡━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ T18 │ v1      │ <DATE> │ in use │ 100  │ m/s   │ 2.89884e+09 │ sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel     │ datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DENo… │ 3        │
+│ T18 │ v2      │ <DATE> │ in use │ 100  │ m/s   │ 2.98919e+08 │ sensor_Nanometrics_TrilliumCompact120_SG754_LP120_STgrou… │ datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.001_FPMi… │ 3        │
+└─────┴─────────┴────────────┴────────┴──────┴───────┴─────────────┴───────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────┴──────────┘
+
+$ nrlx assets get T18 -o latest.resp --db assets.sqlite
+exit 1
+Error: T18 has 2 variants for these keys (v1: 100 sps, sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel, datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DENone; v2: 100 sps, 
+sensor_Nanometrics_TrilliumCompact120_SG754_LP120_STgroundVel, datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.001_FPMinimum): add a key (FR=100, rate=40) or --version.
+
+$ nrlx assets get T18 --version 1 -o v1.xml --db assets.sqlite
+exit 0
+╭─────────── nrlx ────────────╮
+│ T18 v1 written (stationxml) │
+│                             │
+│   v1.xml                    │
+╰─────────────────────────────╯
+
+$ nrlx assets deprecate T18 --version 2 --db assets.sqlite
+exit 0
+T18 v2 deprecated.
+
+$ nrlx assets list T18 --db assets.sqlite
+exit 0
+                                                                                         Assets: assets.sqlite                                                                                          
+┏━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ UID ┃ Version ┃ Added      ┃ Status                ┃ Rate ┃ Units ┃ Sensitivity ┃ Sensor                                             ┃ Datalogger                                         ┃ Channels ┃
+┡━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ T18 │ v1      │ <DATE> │ in use                │ 100  │ m/s   │ 2.89884e+09 │ sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroun… │ datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelo… │ 3        │
+│ T18 │ v2      │ <DATE> │ deprecated <DATE> │ 100  │ m/s   │ 2.98919e+08 │ sensor_Nanometrics_TrilliumCompact120_SG754_LP120… │ datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.… │ 3        │
+└─────┴─────────┴────────────┴───────────────────────┴──────┴───────┴─────────────┴────────────────────────────────────────────────────┴────────────────────────────────────────────────────┴──────────┘
+
+$ nrlx assets export exported --db assets.sqlite
+exit 0
+╭─────── nrlx ────────╮
+│ Exported 3 versions │
+│                     │
+│   exported          │
+╰─────────────────────╯
+
+$ nrlx assets import exported --db copy.sqlite
+exit 0
+╭─────────────── nrlx ────────────────╮
+│ Imported 3 versions, 0 already here │
+│                                     │
+│   copy.sqlite                       │
+╰─────────────────────────────────────╯
+
+$ nrlx assets list --db copy.sqlite
+exit 0
+                                                                                          Assets: copy.sqlite                                                                                           
+┏━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ UID   ┃ Version ┃ Added      ┃ Status                ┃ Rate ┃ Units ┃ Sensitivity ┃ Sensor                                            ┃ Datalogger                                        ┃ Channels ┃
+┡━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ SPARE │ v1      │ <DATE> │ in use                │ 100  │ m/s   │ 2.98919e+08 │ sensor_Nanometrics_TrilliumCompact120_SG754_LP12… │ datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0… │ 3        │
+│ T18   │ v1      │ <DATE> │ in use                │ 100  │ m/s   │ 2.89884e+09 │ sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgrou… │ datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbel… │ 3        │
+│ T18   │ v2      │ <DATE> │ deprecated <DATE> │ 100  │ m/s   │ 2.98919e+08 │ sensor_Nanometrics_TrilliumCompact120_SG754_LP12… │ datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0… │ 3        │
+└───────┴─────────┴────────────┴───────────────────────┴──────┴───────┴─────────────┴───────────────────────────────────────────────────┴───────────────────────────────────────────────────┴──────────┘

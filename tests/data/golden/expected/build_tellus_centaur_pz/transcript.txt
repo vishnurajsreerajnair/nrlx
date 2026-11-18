@@ -1,0 +1,35 @@
+$ nrlx response --sensor sensor_Lunitek_TELLUS_LP1_SG400_STgroundVel --datalogger datalogger_Nanometrics_Centaur_FV2Vpp_FR100_DFOff_FPLinear --network XY --location 00 --station T03 --channels HHZ,HHN,HHE -o out.pz --cache-root cache
+exit 0
+                               sensor: sensor_Lunitek_TELLUS_LP1_SG400_STgroundVel                               
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                 ┃ Value                                                                                 ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element               │ sensor                                                                                │
+│ Manufacturer          │ Lunitek                                                                               │
+│ Model                 │ TELLUS                                                                                │
+│ Version               │ <DATE>                                                                            │
+│ Description           │ Lunitek; TELLUS; Long-Period_Corner 1 s; Sensitivity 400 V/m/s; Sensor_Type groundVel │
+│ Long-Period_Corner LP │ 1 s                                                                                   │
+│ Sensitivity SG        │ 400 V/m/s                                                                             │
+│ Sensor_Type ST        │ groundVel                                                                             │
+└───────────────────────┴───────────────────────────────────────────────────────────────────────────────────────┘
+                                   datalogger: datalogger_Nanometrics_Centaur_FV2Vpp_FR100_DFOff_FPLinear                                    
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field                 ┃ Value                                                                                                             ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Element               │ datalogger                                                                                                        │
+│ Manufacturer          │ Nanometrics                                                                                                       │
+│ Model                 │ Centaur                                                                                                           │
+│ Version               │ <DATE>                                                                                                        │
+│ Description           │ Nanometrics; Centaur; Full-Scale_Voltage 2Vpp; Final_Sample_Rate 100 Hz; DC_Filter Off; Final_Filter_Phase Linear │
+│ Full-Scale_Voltage FV │ 2Vpp                                                                                                              │
+│ Final_Sample_Rate FR  │ 100 Hz                                                                                                            │
+│ DC_Filter DF          │ Off                                                                                                               │
+│ Final_Filter_Phase FP │ Linear                                                                                                            │
+└───────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+note: stage 1: the normalization factor gives x0.998607 of its gain 400 at 5 Hz, kept as received (obspy lets the gain win unless the sensitivity is at 5 Hz); a combination by nrlx corrects it
+╭────────── nrlx ──────────╮
+│ Response written (sacpz) │
+│                          │
+│   out.pz                 │
+╰──────────────────────────╯

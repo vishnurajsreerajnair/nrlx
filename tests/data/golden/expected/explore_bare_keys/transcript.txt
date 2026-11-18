@@ -1,0 +1,14 @@
+$ nrlx response STS-2 --cache-root cache
+exit 0
+                             keys: 6 configurations                              
+┏━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Manufacturer ┃ Model ┃ Instconfig                                             ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Streckeisen  │ STS-2 │ sensor_Streckeisen_STS-2_EG1_SG1500_LP120_STgroundVel  │
+│ Streckeisen  │ STS-2 │ sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel  │
+│ Streckeisen  │ STS-2 │ sensor_Streckeisen_STS-2_EG2_SG1500_LP120_STgroundVel  │
+│ Streckeisen  │ STS-2 │ sensor_Streckeisen_STS-2_EG3_SG20000_LP120_STgroundVel │
+│ Streckeisen  │ STS-2 │ sensor_Streckeisen_STS-2_EG1_SG20000_LP120_STgroundVel │
+│ Streckeisen  │ STS-2 │ sensor_Streckeisen_STS-2_EG2_SG20000_LP120_STgroundVel │
+└──────────────┴───────┴────────────────────────────────────────────────────────┘
+Still varying: EG 1, 2, 3 · SG 1500 V/m/s, 20000 V/m/s

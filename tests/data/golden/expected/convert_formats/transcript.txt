@@ -1,0 +1,32 @@
+$ nrlx convert sts2_q330.dataless -o from_dataless.xml
+exit 0
+╭───────────────────── nrlx ─────────────────────╮
+│ Converted to stationxml, read back and checked │
+│                                                │
+│   from_dataless.xml                            │
+╰────────────────────────────────────────────────╯
+
+$ nrlx convert from_dataless.xml -o from_xml.resp
+exit 0
+╭────────────────── nrlx ──────────────────╮
+│ Converted to resp, read back and checked │
+│                                          │
+│   from_xml.resp                          │
+╰──────────────────────────────────────────╯
+
+$ nrlx convert from_dataless.xml -o from_xml.pz
+exit 0
+note: XX.YY.00.ZZZ: SACPZ keeps stage 1 and the overall sensitivity, and drops the other 3 stages: within 0.81% up to 3.57 Hz, 23.00% at 16 Hz
+╭────────────────── nrlx ───────────────────╮
+│ Converted to sacpz, read back and checked │
+│                                           │
+│   from_xml.pz                             │
+╰───────────────────────────────────────────╯
+
+$ nrlx convert from_xml.resp --split -o split.xml
+exit 0
+╭───────────────────── nrlx ─────────────────────╮
+│ Converted to stationxml, read back and checked │
+│                                                │
+│   split_XX.YY.00.ZZZ.xml                       │
+╰────────────────────────────────────────────────╯

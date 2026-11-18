@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Internal
+
+- Golden tests: 24 cases check that every command still gives the results of 0.3.0b1.
+
 ## [0.3.0b1] - 2026-11-16
 
 The package is restructured in layers, as in isamgeo-seismic-tools: `schema`

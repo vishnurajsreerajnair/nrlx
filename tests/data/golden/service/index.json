@@ -1,0 +1,82 @@
+{
+  "combine_0e35ffa69dfb511e": {
+    "params": {
+      "format": "stationxml",
+      "instconfig": "sensor_Guralp_CMG-40T_LP30_HF50_SG1600_STgroundVel:datalogger_Guralp_CMG-DM24-Mk3-Fixed_TL77_TP400-100-20-10-2-1_FR100",
+      "nodata": 404
+    },
+    "url": "https://service.earthscope.org/irisws/nrl/1/combine"
+  },
+  "combine_11e4b4af7bff1577": {
+    "params": {
+      "format": "stationxml",
+      "instconfig": "soh_Quanterra_Q330HR-PacketBaler_CDInputVoltage_SG6.667_FR0.1",
+      "nodata": 404
+    },
+    "url": "https://service.earthscope.org/irisws/nrl/1/combine"
+  },
+  "combine_1542d29c4ea4f45c": {
+    "params": {
+      "format": "stationxml",
+      "instconfig": "sensor_Streckeisen_STS-2_EG3_SG1500_LP120_STgroundVel:datalogger_Quanterra_Q330HR_PG1_FR100_ADHR_LRbelow20_DENone",
+      "nodata": 404
+    },
+    "url": "https://service.earthscope.org/irisws/nrl/1/combine"
+  },
+  "combine_29bfa5343e6a2e6b": {
+    "params": {
+      "format": "stationxml",
+      "instconfig": "sensor_Lunitek_TELLUS_LP1_SG400_STgroundVel:datalogger_Nanometrics_Centaur_FV2Vpp_FR100_DFOff_FPLinear",
+      "nodata": 404
+    },
+    "url": "https://service.earthscope.org/irisws/nrl/1/combine"
+  },
+  "combine_392c66dca07881a1": {
+    "params": {
+      "format": "stationxml",
+      "instconfig": "sensor_Sercel_L-22D_LF2_RC5470_RS20000_SG87.9_STgroundVel:datalogger_REFTEK_130-01_PG32_FR100",
+      "nodata": 404
+    },
+    "url": "https://service.earthscope.org/irisws/nrl/1/combine"
+  },
+  "combine_909392baa6b29394": {
+    "params": {
+      "format": "stationxml",
+      "instconfig": "sensor_GeoSpace_GS-11D_LF10_RC380_RS887_SG22.3_STgroundVel:datalogger_Lunitek_ATLAS_FV2.5Vpp_FR100_FPLinear",
+      "nodata": 404
+    },
+    "url": "https://service.earthscope.org/irisws/nrl/1/combine"
+  },
+  "combine_c4bee0b2dc97e9b9": {
+    "params": {
+      "format": "stationxml",
+      "instconfig": "integrated_Gem_GemInfrasoundV1.0_AR0_LP26_FR100_SG286",
+      "nodata": 404
+    },
+    "url": "https://service.earthscope.org/irisws/nrl/1/combine"
+  },
+  "combine_ce21c5037c631d44": {
+    "params": {
+      "format": "stationxml",
+      "instconfig": "sensor_Kinemetrics_Episensor-ES-T_CG4g_FV10Vp_OWSingle-ended_HF200_SG0.2549_STgroundAccel:datalogger_Kinemetrics_Basalt_PG8_FV10Vpp_FR200_FPCausal",
+      "nodata": 404
+    },
+    "url": "https://service.earthscope.org/irisws/nrl/1/combine"
+  },
+  "combine_d059c620fccd180b": {
+    "params": {
+      "format": "stationxml",
+      "instconfig": "datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.001_FPMinimum",
+      "nodata": 404
+    },
+    "url": "https://service.earthscope.org/irisws/nrl/1/combine"
+  },
+  "combine_feb2278b6193bd0e": {
+    "params": {
+      "format": "stationxml",
+      "instconfig": "sensor_Nanometrics_TrilliumCompact120_SG754_LP120_STgroundVel:datalogger_Nanometrics_Centaur_FV40Vpp_FR100_DF0.001_FPMinimum",
+      "nodata": 404
+    },
+    "url": "https://service.earthscope.org/irisws/nrl/1/combine"
+  }
+}

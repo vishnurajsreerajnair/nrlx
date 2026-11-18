@@ -1,0 +1,22 @@
+$ nrlx response --cache-root cache
+exit 0
+    NRL catalog: add keys, or a part (--sensor ...)    
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Element    ┃ Manufacturer ┃ Models ┃ Configurations ┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ datalogger │ Guralp       │      1 │            570 │
+│ datalogger │ Kinemetrics  │      1 │            270 │
+│ datalogger │ Lunitek      │      1 │             56 │
+│ datalogger │ Nanometrics  │      1 │            360 │
+│ datalogger │ Quanterra    │      1 │            176 │
+│ datalogger │ REFTEK       │      1 │             39 │
+│ integrated │ Gem          │      1 │              2 │
+│ sensor     │ GeoSpace     │      1 │              7 │
+│ sensor     │ Guralp       │      1 │             44 │
+│ sensor     │ Kinemetrics  │      1 │             20 │
+│ sensor     │ Lunitek      │      1 │             10 │
+│ sensor     │ Nanometrics  │      1 │              2 │
+│ sensor     │ Sercel       │      1 │              6 │
+│ sensor     │ Streckeisen  │      1 │              6 │
+│ soh        │ Quanterra    │      1 │              9 │
+└────────────┴──────────────┴────────┴────────────────┘
